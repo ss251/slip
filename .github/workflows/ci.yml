@@ -1,0 +1,73 @@
+# CI grounded in two sources (not invented):
+# - official midnightntwrk repos: setup-compact-action (SHA-pinned below exactly as
+#   midnightntwrk/midnight-verifiable-credentials pins it), COMPACT_COMPILER_VERSION env,
+#   and `compact compile --version` as the toolchain sanity check.
+# - the vendored midnight-compact skill (reference/testing.md §13): compile + simulator
+#   tests on every commit; local-network tests only on main; privacy/invariant tests in
+#   the per-commit lane.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  COMPACT_COMPILER_VERSION: "0.30.0" # version exercised in official CI; bump deliberately with the compatibility matrix
+
+jobs:
+  design-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Design & privacy gate
+        run: sh scripts/design-gate.sh Slip
+
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect contract
+        id: has
+        run: |
+          if [ -f contracts/slip.compact ]; then echo "contract=true" >> "$GITHUB_OUTPUT"; else echo "contract=false" >> "$GITHUB_OUTPUT"; echo "pre-scaffold: no contracts/ yet — lane skips"; fi
+      - name: Set up Compact toolchain
+        if: steps.has.outputs.contract == 'true'
+        uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8 # v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          compact-version: ${{ env.COMPACT_COMPILER_VERSION }}
+      - name: Verify Compact installation
+        if: steps.has.outputs.contract == 'true'
+        run: compact compile --version
+      - name: Compile contract
+        if: steps.has.outputs.contract == 'true'
+        run: compact compile contracts/slip.compact build/slip
+      - name: Simulator tests (incl. privacy-leak + invariant probes)
+        if: steps.has.outputs.contract == 'true'
+        run: |
+          if [ -f package.json ]; then npm ci && npm run test:simulator; else echo "no package.json yet — add simulator tests with the first circuit" >&2; exit 1; fi
+
+  app-tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift/Xcode tests (skips until targets exist)
+        run: |
+          if [ ! -d Slip.xcodeproj ] && [ ! -d Slip.xcworkspace ] && [ ! -f MidnightKit/Package.swift ]; then
+            echo "no Swift targets yet — skipping (pre-scaffold)"; exit 0; fi
+          if [ -f MidnightKit/Package.swift ]; then swift test --package-path MidnightKit; fi
+          if [ -d Slip.xcodeproj ] || [ -d Slip.xcworkspace ]; then
+            xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 16' test; fi
+
+  # per skill §13: local-network e2e runs on main only, not every PR
+  network-e2e:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Local network round-trip (arm when e2e exists)
+        run: |
+          if [ ! -f package.json ] || ! grep -q '"test:network"' package.json; then echo "no network tests yet — skipping"; exit 0; fi
+          npm ci && npm run test:network
