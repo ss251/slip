@@ -1,0 +1,25 @@
+# private agent context
+CLAUDE.local.md
+.claude/settings.local.json
+
+# apple
+.DS_Store
+xcuserdata/
+DerivedData/
+*.xcresult
+
+# build artifacts
+build/
+.build/
+target/
+node_modules/
+dist/
+
+# midnight artifacts (decide tracking policy at first compile; keys may move to LFS)
+*.zkir
+keys/
+params-cache/
+
+# env & logs
+.env*
+*.log
