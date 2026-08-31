@@ -1,0 +1,301 @@
+pragma language_version >= 0.26;
+
+// Slip — sealed group predictions.
+//
+// One slip = one round of a sealed group prediction. A steward opens a slip
+// (question + seal deadline), crew members privately seal a pick, and after the
+// deadline everyone opens their seal. A reveal that does not re-derive its
+// stored commitment is rejected by the contract.
+//
+// Privacy invariant (.claude/rules/privacy.md): a member's {choice, salt} is
+// witness data that never leaves the device. Only the commitment travels before
+// the deadline. Every disclose() below carries a one-line note naming exactly
+// what becomes public and why that is intended.
+
+import CompactStandardLibrary;
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// draft   — deployed, no slip opened yet (also the state before the first round)
+// open    — a slip is live: seal before sealDeadline, reveal after it
+// settled — the steward has recorded the real-world outcome; reveals still allowed
+export enum SlipStatus {
+  draft,
+  open,
+  settled
+}
+
+// Choice / outcome encoding, used for both picks and the settled outcome.
+// Two sides only in Wave 1: 0 = No, 1 = Yes. (Compact has no top-level const,
+// so these are literals guarded by an in-circuit range check at every entry.)
+
+// ---------------------------------------------------------------------------
+// Public ledger state
+// ---------------------------------------------------------------------------
+
+export ledger status: SlipStatus;
+
+// Authorization material for the steward. Set once, in the constructor, to
+// H("slip:steward:v1" || stewardSecret). See assertSteward() for the rationale.
+export sealed ledger stewardAuth: Bytes<32>;
+
+// Hash/commitment of the question text. The text itself lives off-chain (the
+// app distributes it with the invite); this pins it so it cannot be edited
+// after picks are sealed.
+export ledger questionCommit: Bytes<32>;
+
+// Seconds since the Unix epoch (base-crypto Timestamp is a u64 "time since Unix
+// Epoch"), after which sealing stops and revealing opens.
+//
+// Enforced via blockTimeLt / blockTimeGte. These are consensus-enforced, not
+// prover-trusted: the compared time is read from the call context's `tblock`,
+// which LedgerState::apply() sources from the real block, and every validating
+// node re-executes the recorded transcript against it. A prover who fabricates
+// a favorable time locally still produces an internally valid proof, but the
+// recomputed result diverges from the one baked into the transaction and the
+// node rejects it outright. So sealing genuinely cannot happen after the
+// deadline — verified against midnight-ledger 9.1.0.0-rc.3 source, not docs.
+//
+// Caveat: block time is accurate to the scale of blocks, not seconds. Pick
+// deadlines with a margin, and never treat this as a clock or a randomness
+// source. (blockTimeGte is a De Morgan negation of the strict kernel op, not a
+// separate primitive — no behavioural difference, but that is why there is no
+// kernel-level >= .)
+//
+// Not `sealed` (the docs' single-deadline example is) because this contract
+// hosts a sequence of slips. It is protected instead by createSlip() refusing
+// to run mid-round, so a live slip's deadline can never be moved.
+export ledger sealDeadline: Uint<64>;
+
+// Increments once per slip. Bound into every commitment so a commitment from
+// one round can never be replayed into another.
+export ledger roundId: Counter;
+
+// Public crew roster: member identities enrolled by the steward. Membership is
+// public by design (the app shows a roster and seal progress); a member's pick
+// is not.
+export ledger crew: Set<Bytes<32>>;
+
+// memberId -> sealed pick commitment for the current round.
+export ledger seals: Map<Bytes<32>, Bytes<32>>;
+
+// memberId -> revealed choice for the current round. Only written by reveal(),
+// and only after the commitment has been re-derived and matched.
+export ledger reveals: Map<Bytes<32>, Uint<8>>;
+
+// Aggregate tallies for the current round, so a client can render results
+// without enumerating the reveals map.
+export ledger tallyNo: Counter;
+
+export ledger tallyYes: Counter;
+
+// Real-world outcome, meaningful only once status == settled. 0 = No, 1 = Yes.
+export ledger outcome: Uint<8>;
+
+// ---------------------------------------------------------------------------
+// Witnesses — implemented host-side (MidnightKit), never leave the device
+// ---------------------------------------------------------------------------
+
+// The device's long-lived Slip secret. Identity is proved by knowing it, never
+// by asserting it.
+witness localSecretKey(): Bytes<32>;
+
+// This device's pick for the current round: 0 = No, 1 = Yes.
+witness localPick(): Uint<8>;
+
+// Per-round random salt that makes the commitment hiding. Must be identical at
+// seal and at reveal; losing it means the pick can never be opened.
+witness localPickSalt(): Bytes<32>;
+
+// ---------------------------------------------------------------------------
+// Derivations
+// ---------------------------------------------------------------------------
+
+// A member's public identity: the image of their device secret under a
+// domain-separated hash. Nobody can claim an identity without knowing the
+// preimage, which is what makes this usable for authorization.
+export pure circuit memberIdOf(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "slip:member:v1"), sk]);
+}
+
+// The sealed pick. persistentCommit is hiding (the salt is 32 bytes of fresh
+// randomness, so the commitment is indistinguishable across choices) and
+// binding (SHA-256 preimage resistance: no second {choice, salt} opens it).
+// Binding in round and memberId means a commitment is valid only for the member
+// and round it was made for — it cannot be copied off-chain and re-sealed by
+// someone else, or replayed into a later round.
+export pure circuit pickCommitment(
+                      round: Uint<64>,
+                      memberId: Bytes<32>,
+                      choice: Uint<8>,
+                      salt: Bytes<32>
+                      ): Bytes<32> {
+  return persistentCommit<Vector<4, Bytes<32>>>(
+           [pad(32, "slip:pick:v1"),
+            round as Field as Bytes<32>,
+            memberId,
+            choice as Field as Bytes<32>],
+           salt
+           );
+}
+
+// Steward authorization.
+//
+// Deliberately NOT ownPublicKey(). That builtin reports the caller's Zswap coin
+// public key out of prover-supplied local state; nothing in the circuit proves
+// the caller holds the corresponding secret key, so an "owner == ownPublicKey()"
+// check is a witness trust-boundary bypass — any prover can assert any identity.
+//
+// Instead the steward proves knowledge of a secret whose domain-separated hash
+// was fixed at deployment. Producing a satisfying proof requires the preimage,
+// which is exactly the property an authorization check needs.
+circuit assertSteward(): [] {
+  const claimed = persistentHash<Vector<2, Bytes<32>>>(
+                    [pad(32, "slip:steward:v1"), localSecretKey()]
+                    );
+  // Discloses only the boolean "the caller knows the steward secret". That fact
+  // is already public from the transaction succeeding; the secret itself is not
+  // disclosed, and the hash is preimage-resistant.
+  assert(disclose(claimed == stewardAuth), "not the steward");
+}
+
+// ---------------------------------------------------------------------------
+// Constructor
+// ---------------------------------------------------------------------------
+
+constructor() {
+  // Discloses H("slip:steward:v1" || stewardSecret) — a one-way image of the
+  // deployer's secret. Public on purpose: it is the anchor every later steward
+  // action is checked against. The secret is not recoverable from it.
+  stewardAuth =
+    disclose(persistentHash<Vector<2, Bytes<32>>>([pad(32, "slip:steward:v1"), localSecretKey()]));
+  status = SlipStatus.draft;
+  questionCommit = default<Bytes<32>>;
+  sealDeadline = 0 as Uint<64>;
+  outcome = 0 as Uint<8>;
+}
+
+// ---------------------------------------------------------------------------
+// Circuits
+// ---------------------------------------------------------------------------
+
+// Steward opens a slip. Clears the previous round's seals, reveals and tallies,
+// then arms the new round. Callable from draft (first slip) or settled (next
+// slip in the same crew's contract) — never mid-round, so an in-flight slip
+// cannot be wiped out from under the crew.
+// `deadline` is seconds since the Unix epoch.
+export circuit createSlip(question: Bytes<32>, deadline: Uint<64>): [] {
+  assertSteward();
+  assert(status == SlipStatus.draft || status == SlipStatus.settled, "a slip is already open");
+  // Discloses the caller-supplied deadline. Public by design: the crew must be
+  // able to see when sealing closes, and it is enforced against block time.
+  const publicDeadline = disclose(deadline);
+  assert(blockTimeLt(publicDeadline), "deadline must be in the future");
+
+  seals.resetToDefault();
+  reveals.resetToDefault();
+  tallyNo.resetToDefault();
+  tallyYes.resetToDefault();
+
+  roundId.increment(1);
+  // Discloses the question commitment. Public by design: it pins the question
+  // text (held off-chain) so it cannot be reworded after picks are sealed.
+  questionCommit = disclose(question);
+  sealDeadline = publicDeadline;
+  outcome = 0 as Uint<8>;
+  status = SlipStatus.open;
+}
+
+// Steward adds a member identity to the public roster. Gating enrollment on the
+// steward is what makes seals sybil-resistant: a stranger who obtains the
+// contract address still cannot seal, because only enrolled memberIds pass the
+// crew check in sealPick().
+export circuit enrollMember(memberId: Bytes<32>): [] {
+  assertSteward();
+  // Discloses the member's public identity. Public by design: the roster and
+  // "3 of 5 sealed" progress are product surface. It is a hash of the member's
+  // secret, so it identifies them without exposing anything about their picks.
+  const publicMemberId = disclose(memberId);
+  assert(!crew.member(publicMemberId), "already enrolled");
+  crew.insert(publicMemberId);
+}
+
+// Seal a pick. The pick itself stays on the device; only its commitment lands
+// on-chain. One seal per member per round.
+export circuit sealPick(): [] {
+  assert(status == SlipStatus.open, "no slip is open");
+  // Sealing closes at the deadline whether or not the steward is online.
+  assert(blockTimeLt(sealDeadline), "sealing has closed");
+
+  const memberId = memberIdOf(localSecretKey());
+  // Discloses which member is sealing — not what they sealed. Public by design:
+  // the crew sees who has locked in. Derived from the device secret, so this
+  // doubles as proof the caller really is that member.
+  const publicMemberId = disclose(memberId);
+  assert(crew.member(publicMemberId), "not in this crew");
+  // One seal per member per round: a second attempt finds the key present and
+  // aborts. There is no circuit that removes a seal, so this cannot be undone.
+  assert(!seals.member(publicMemberId), "already sealed this round");
+
+  const choice = localPick();
+  // Discloses only the boolean "the pick is a legal side", not the side itself.
+  // Checked in-circuit so an out-of-range pick cannot produce a valid proof.
+  assert(disclose(choice < 2), "pick must be 0 (No) or 1 (Yes)");
+
+  // No disclose() on the commitment: persistentCommit hides its inputs, and the
+  // compiler treats commitment outputs as safe to publish. This is the one value
+  // that is meant to travel.
+  seals.insert(publicMemberId, pickCommitment(roundId.read(), memberId, choice, localPickSalt()));
+}
+
+// Open a sealed pick after the deadline. The contract re-derives the commitment
+// from the submitted witness data and rejects any mismatch, so a member can only
+// ever open to the pick they actually sealed.
+export circuit reveal(): [] {
+  assert(status != SlipStatus.draft, "no slip to reveal");
+  // Revealing opens exactly when sealing closes — enforced against block time,
+  // so nobody can open early and nobody has to wait on the steward.
+  assert(blockTimeGte(sealDeadline), "reveals open after the deadline");
+
+  const memberId = memberIdOf(localSecretKey());
+  // Discloses which member is revealing. Public by design: an opened pick is
+  // attributed to its owner — that is the whole point of the reveal.
+  const publicMemberId = disclose(memberId);
+  assert(seals.member(publicMemberId), "nothing sealed for this member");
+  assert(!reveals.member(publicMemberId), "already revealed this round");
+
+  const choice = localPick();
+  const recomputed = pickCommitment(roundId.read(), memberId, choice, localPickSalt());
+  // Discloses only the boolean "this opening matches the seal". A false value
+  // aborts the transaction, so a wrong choice or a wrong salt cannot be smoothed
+  // over by the client.
+  assert(disclose(recomputed == seals.lookup(publicMemberId)), "reveal does not match the seal");
+
+  // Discloses the choice. Intended and central: after the deadline the pick
+  // becomes public to the crew and the chain, verified against the seal.
+  const publicChoice = disclose(choice);
+  reveals.insert(publicMemberId, publicChoice);
+  if (publicChoice == 1 as Uint<8>) {
+    tallyYes.increment(1);
+  } else {
+    tallyNo.increment(1);
+  }
+}
+
+// Steward records the real-world outcome. Scores are not stored: every input to
+// them (each member's revealed choice, and the outcome) is already public, so a
+// client computes the scoreboard deterministically from ledger state. Keeping it
+// off-chain avoids a per-member loop in-circuit and keeps this circuit small.
+export circuit settle(result: Uint<8>): [] {
+  assertSteward();
+  assert(status == SlipStatus.open, "no open slip to settle");
+  assert(blockTimeGte(sealDeadline), "cannot settle before the deadline");
+  // Discloses the outcome the steward is recording. Public by design: it is the
+  // shared result the whole crew is scored against.
+  const publicResult = disclose(result);
+  assert(publicResult < 2, "outcome must be 0 (No) or 1 (Yes)");
+  outcome = publicResult;
+  status = SlipStatus.settled;
+}

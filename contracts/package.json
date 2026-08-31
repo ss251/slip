@@ -1,0 +1,16 @@
+{
+  "name": "slip-contracts",
+  "private": true,
+  "type": "module",
+  "description": "Compact contract + simulator tests. Runtime is pinned to what our compiler emits (compact compile -- --runtime-version), never npm latest — see scripts/freshness-gate.sh.",
+  "scripts": {
+    "build": "compact compile slip.compact build",
+    "build:fast": "compact compile --skip-zk slip.compact build",
+    "pretest": "npm run build:fast && node test/link-build.mjs",
+    "test": "node test/slip.test.mjs && node test/leak.mjs"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "0.19.0",
+    "@midnight-ntwrk/midnight-js-network-id": "4.1.1"
+  }
+}

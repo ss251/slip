@@ -23,3 +23,6 @@ params-cache/
 # env & logs
 .env*
 *.log
+
+# generated symlink to compiled contract (recreated by contracts/test/link-build.mjs)
+contracts/test/slipcontract

@@ -49,8 +49,8 @@ jobs:
         run: compact compile contracts/slip.compact build/slip
       - name: Simulator tests (incl. privacy-leak + invariant probes)
         if: steps.has.outputs.contract == 'true'
-        run: |
-          if [ -f package.json ]; then npm ci && npm run test:simulator; else echo "no package.json yet — add simulator tests with the first circuit" >&2; exit 1; fi
+        working-directory: contracts
+        run: npm install && npm test
 
   app-tests:
     runs-on: macos-15

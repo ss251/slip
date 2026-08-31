@@ -57,10 +57,13 @@ if [ -d contracts ]; then
     [ -f "$f" ] || continue
     P=$(grep -oE 'pragma[[:space:]]+language_version[[:space:]]*>=[[:space:]]*[0-9.]+' "$f" | grep -oE '[0-9.]+$')
     [ -z "$P" ] && { WARN "$f has no language_version pragma"; continue; }
-    LOWEST=$(printf '%s\n%s\n' "$P" "$LANGUAGE" | sort -V | head -1)
-    if [ "$LOWEST" != "$P" ]; then
+    # normalize to 3 components so 0.26 and 0.26.0 compare equal
+    norm() { echo "$1" | awk -F. '{printf "%d.%d.%d", $1, ($2==""?0:$2), ($3==""?0:$3)}'; }
+    PN=$(norm "$P"); LN=$(norm "$LANGUAGE")
+    LOWEST=$(printf '%s\n%s\n' "$PN" "$LN" | sort -V | head -1)
+    if [ "$LOWEST" != "$PN" ] && [ "$PN" != "$LN" ]; then
       FAIL "$f requires language >= $P but installed language is $LANGUAGE"
-    elif [ "$P" != "$LANGUAGE" ]; then
+    elif [ "$PN" != "$LN" ]; then
       WARN "$f pragma $P is below installed language $LANGUAGE — compiles, but re-verify the examples it was written from"
     else
       OK "$f pragma matches language $LANGUAGE"
