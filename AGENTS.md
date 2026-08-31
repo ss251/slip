@@ -23,7 +23,6 @@ scripts/          design-gate.sh, freshness-gate.sh, install-hooks.sh (run once:
 docs/design/      the eight target screens as PNGs — UI work matches these, pixel-close
 docs/how-slip-works.html  interactive end-to-end explainer (self-contained)
 .claude/docs/     deep references — read the relevant one before working in that area
-.claude/skills/   in-repo Compact skill (validated examples + gotchas)
 ```
 
 ## Setup
@@ -31,7 +30,8 @@ docs/how-slip-works.html  interactive end-to-end explainer (self-contained)
 1. Compact toolchain: install the `compact` CLI, then `compact self update && compact update`. Verified stack as of 2026-08-31: **CLI 0.5.2 · compiler 0.34.0 · language 0.26.0 · ledger 9.1.0.0-rc.3 · runtime 0.19.0**. The toolchain moves fast and breaks. **`scripts/freshness-gate.sh` enforces this** (pre-push + CI): it fails on drift we control — a `compact-runtime` pin that isn't what our compiler emits, a CI pin that isn't the local compiler, a pragma above the installed language, docs advertising a stack we no longer run — and warns when the compiler, CLI, or a vendored skill has moved upstream. Rule it encodes: **the compiler decides the runtime version, not npm** (`compact compile -- --runtime-version`).
 2. Local network + proof server: Docker-based `midnight-local-dev` (see `.claude/docs/resources.md`).
 3. Xcode 26 / Swift 6 toolchain; Rust with `aarch64-apple-ios` and `aarch64-apple-ios-sim` targets for MidnightKit work.
-4. AI assistance: install the official **Midnight Expert** plugins (`claude plugin marketplace add https://midnightntwrk.expert`) — they verify generated Compact against the real compiler. This repo also ships a knowledge skill at `.claude/skills/midnight-compact/` (vendored from adavault/midnight-skill, MIT): 30 compiler-validated example contracts — including commit-reveal and prediction-market shapes — plus a long gotchas reference. Use the skill for patterns, the plugin for verification. The docs index for LLMs is `https://docs.midnight.network/llms.txt`.
+4. MCP servers (docs + source lookup): committed in `.mcp.json`, so nothing to install — but they bind at session start, and the Midnight/kapa one needs a one-time OAuth via `/mcp` that its docs page omits. See `.claude/docs/resources.md` §MCP servers.
+5. AI assistance: install the official **Midnight Expert** plugins (`claude plugin marketplace add https://midnightntwrk.expert`) — they verify generated Compact against the real compiler. They are the single documented path for Compact work: 15 focused skills (security, privacy/disclosure, ledger, witness-ts, circuit costs, patterns, language ref, debugging), an examples plugin, and verification agents that compile and execute against the real compiler rather than recalling syntax. The docs index for LLMs is `https://docs.midnight.network/llms.txt`.
 
 ## Commands
 

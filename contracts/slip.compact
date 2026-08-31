@@ -7,10 +7,12 @@ pragma language_version >= 0.26;
 // deadline everyone opens their seal. A reveal that does not re-derive its
 // stored commitment is rejected by the contract.
 //
-// Privacy invariant (.claude/rules/privacy.md): a member's {choice, salt} is
-// witness data that never leaves the device. Only the commitment travels before
-// the deadline. Every disclose() below carries a one-line note naming exactly
-// what becomes public and why that is intended.
+// Privacy invariant (.claude/rules/privacy.md): a member's {choice, salt} never
+// leaves the device. `choice` is witness data; the salt is derived in-circuit
+// from the device secret (see pickSaltOf) rather than supplied by the host, so
+// there is one fewer secret for the host to mishandle. Only the commitment
+// travels before the deadline. Every disclose() below carries a one-line note
+// naming exactly what becomes public and why that is intended.
 
 import CompactStandardLibrary;
 
@@ -18,18 +20,32 @@ import CompactStandardLibrary;
 // Types
 // ---------------------------------------------------------------------------
 
-// draft   — deployed, no slip opened yet (also the state before the first round)
-// open    — a slip is live: seal before sealDeadline, reveal after it
-// settled — the steward has recorded the real-world outcome; reveals still allowed
+// draft    — deployed, no slip opened yet (also the state before the first round)
+// open     — a slip is live: sealing, then revealing, then awaiting the steward.
+//            Which phase you are in is read off block time against the
+//            deadlines, not off status.
+// settled  — the steward recorded an outcome. Still challengeable until
+//            disputeDeadline.
+// disputed — a participating member challenged the recorded outcome, voiding it.
+//            Terminal for the round: no re-settle in Wave 1.
+//
+// Two distinct "no result" endings, deliberately distinguishable:
+//   status == open     past settleDeadline -> the steward never settled
+//   status == disputed                     -> the steward settled and was
+//                                             challenged
+// Both leave the crew without a score, but they are different stories and the UI
+// should tell them differently. See the `outcome` sentinels.
 export enum SlipStatus {
   draft,
   open,
-  settled
+  settled,
+  disputed
 }
 
 // Choice / outcome encoding, used for both picks and the settled outcome.
 // Two sides only in Wave 1: 0 = No, 1 = Yes. (Compact has no top-level const,
 // so these are literals guarded by an in-circuit range check at every entry.)
+// The values 2 and 3 are reserved sentinels — see the `outcome` ledger field.
 
 // ---------------------------------------------------------------------------
 // Public ledger state
@@ -69,6 +85,62 @@ export ledger questionCommit: Bytes<32>;
 // to run mid-round, so a live slip's deadline can never be moved.
 export ledger sealDeadline: Uint<64>;
 
+// ---------------------------------------------------------------------------
+// THE ROUND TIMELINE
+// ---------------------------------------------------------------------------
+//
+//   ..< sealDeadline                    SEAL     sealPick()
+//   [sealDeadline, revealDeadline)      REVEAL   reveal() — opens the INSTANT
+//                                                sealing closes. This is the
+//                                                product: the crew opens
+//                                                together, on the clock, with
+//                                                nobody waiting on anybody.
+//   [revealDeadline, settleDeadline)    SETTLE   settle() — the steward records
+//                                                the real-world outcome.
+//   [.., disputeDeadline)               DISPUTE  dispute() — any member who
+//                                                sealed this round may void a
+//                                                wrong outcome. Runs from the
+//                                                moment there IS an outcome.
+//   >= disputeDeadline                  CLOSED   the next createSlip() may clear
+//                                                the round.
+//
+// WHY THIS ORDER — the threat being defended against is the steward lying about
+// a fact the whole crew can independently verify. That is the centre of the
+// threat model, and the defence is that any single honest member can veto: they
+// can all see whether it rained.
+//
+// An earlier revision put a *blind* settle window between sealing and revealing,
+// so the steward fixed the outcome before seeing any pick. It was removed as
+// unsatisfiable, not as unsafe: for the steward to settle honestly the outcome
+// must be KNOWN during their window, but sealing must close BEFORE the outcome
+// becomes knowable. The gap between the two is the duration of the real-world
+// event, which varies per question and which the contract cannot know. "Will the
+// home team win tonight?" seals at kickoff and resolves three hours later — the
+// blind window expires mid-game and the round can never be settled. It also cost
+// the crew's shared open-together moment, and it only ever stopped a steward
+// targeting a rival: they always know their own pick, so it never stopped
+// self-favouring. Challengeability protects the centre instead of a corner.
+//
+// The security property that survives from that revision, unchanged:
+//
+//   A SEALED PICK CANNOT BE DESTROYED WHILE IT IS STILL OPENABLE.
+//   reveal() is bounded above by revealDeadline, and createSlip() is bounded
+//   below by disputeDeadline, which is strictly later. A round is only ever
+//   cleared once no reveal() call could succeed against it anyway.
+//
+// In `draft` all four are 0, which makes every blockTimeGte guard on them
+// trivially true — the first round has no predecessor to protect.
+
+// End of the reveal window / start of the settle window.
+export ledger revealDeadline: Uint<64>;
+
+// End of the settle window. After this the steward can no longer record an
+// outcome; the round closes without one.
+export ledger settleDeadline: Uint<64>;
+
+// End of the dispute window, and the instant the round may be cleared.
+export ledger disputeDeadline: Uint<64>;
+
 // Increments once per slip. Bound into every commitment so a commitment from
 // one round can never be replayed into another.
 export ledger roundId: Counter;
@@ -91,8 +163,37 @@ export ledger tallyNo: Counter;
 
 export ledger tallyYes: Counter;
 
-// Real-world outcome, meaningful only once status == settled. 0 = No, 1 = Yes.
+// Real-world outcome:
+//   0 = No
+//   1 = Yes
+//   2 = no outcome recorded (the steward never settled)
+//   3 = recorded and then DISPUTED (voided by a participating member)
+//
+// The sentinels matter. The steward's settle window is bounded, so "the steward
+// missed it" is an ordinary ending, not an error, and a round can legitimately
+// close with no result. Defaulting this field to 0 would render such a round as
+// a real "No" to any client that read `outcome` without also checking `status`,
+// silently inventing a result nobody recorded. 2 and 3 are values settle() can
+// never write (it range-checks `< 2`), so the field is self-describing and a
+// client needs no second field to know what it is looking at.
+//
+// 2 and 3 are kept distinct because they are different stories: nobody recorded
+// a result, versus somebody recorded one and the crew rejected it. Both leave
+// the scoreboard blank; only one of them says something about the steward.
+//
+// This is deliberately sentinels rather than a separate `outcomeRecorded`
+// boolean: a second field would still have to be consulted to avoid the same
+// misread, so it moves the trap rather than removing it.
 export ledger outcome: Uint<8>;
+
+// Who disputed the current round's outcome, or all-zero if nobody did.
+//
+// A dispute is meant to be attributable — that is most of what keeps it honest,
+// since any member can call it and the crew can see who did. The memberId is
+// already disclosed by the transaction that calls dispute(); storing it here
+// means a client can render "Dana challenged this" straight from ledger state
+// without trawling transaction history.
+export ledger disputedBy: Bytes<32>;
 
 // ---------------------------------------------------------------------------
 // Witnesses — implemented host-side (MidnightKit), never leave the device
@@ -105,9 +206,8 @@ witness localSecretKey(): Bytes<32>;
 // This device's pick for the current round: 0 = No, 1 = Yes.
 witness localPick(): Uint<8>;
 
-// Per-round random salt that makes the commitment hiding. Must be identical at
-// seal and at reveal; losing it means the pick can never be opened.
-witness localPickSalt(): Bytes<32>;
+// There is deliberately NO localPickSalt() witness. The salt is derived
+// in-circuit from the device secret — see pickSaltOf().
 
 // ---------------------------------------------------------------------------
 // Derivations
@@ -120,9 +220,37 @@ export pure circuit memberIdOf(sk: Bytes<32>): Bytes<32> {
   return persistentHash<Vector<2, Bytes<32>>>([pad(32, "slip:member:v1"), sk]);
 }
 
-// The sealed pick. persistentCommit is hiding (the salt is 32 bytes of fresh
-// randomness, so the commitment is indistinguishable across choices) and
-// binding (SHA-256 preimage resistance: no second {choice, salt} opens it).
+// The commitment salt, derived rather than supplied.
+//
+// It used to be a witness (localPickSalt()). Nothing in the circuit constrained
+// it, so hiding rested entirely on an unimplemented host promise: a constant, a
+// counter, or a reused value would have made sealed picks readable straight off
+// the ledger — `choice` is one bit and every other commitment input (round,
+// memberId) is public, so a guessable salt is a two-guess break. Losing the salt
+// also made the pick permanently unopenable.
+//
+// Deriving it from the device secret fixes all three at once:
+//   * hiding now rests on localSecretKey() entropy, which identity already
+//     depends on — an attacker who can guess the salt can already impersonate
+//     the member, so there is no new assumption;
+//   * salt reuse across members or rounds is structurally impossible, because
+//     both are hashed in;
+//   * there is nothing extra to lose — a device that can still prove its
+//     identity can always re-derive the salt and open its seal.
+//
+// Exported so the host can reproduce a commitment locally (e.g. to show "you
+// sealed Yes" before the reveal). It takes the secret as an argument, so having
+// the circuit is useless without the secret.
+export pure circuit pickSaltOf(round: Uint<64>, sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>(
+           [pad(32, "slip:picksalt:v1"), round as Field as Bytes<32>, sk]
+           );
+}
+
+// The sealed pick. persistentCommit is hiding (the salt is 32 bytes of
+// preimage-resistant hash output over a secret, so the commitment is
+// indistinguishable across choices) and binding (SHA-256 preimage resistance:
+// no second {choice, salt} opens it).
 // Binding in round and memberId means a commitment is valid only for the member
 // and round it was made for — it cannot be copied off-chain and re-sealed by
 // someone else, or replayed into a later round.
@@ -174,7 +302,14 @@ constructor() {
   status = SlipStatus.draft;
   questionCommit = default<Bytes<32>>;
   sealDeadline = 0 as Uint<64>;
-  outcome = 0 as Uint<8>;
+  // 0 means "no predecessor round to protect" — every blockTimeGte guard on
+  // these passes, so the first createSlip() is unblocked.
+  revealDeadline = 0 as Uint<64>;
+  settleDeadline = 0 as Uint<64>;
+  disputeDeadline = 0 as Uint<64>;
+  // 2 = no outcome recorded. Never 0, which would read as a real "No".
+  outcome = 2 as Uint<8>;
+  disputedBy = default<Bytes<32>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,17 +317,76 @@ constructor() {
 // ---------------------------------------------------------------------------
 
 // Steward opens a slip. Clears the previous round's seals, reveals and tallies,
-// then arms the new round. Callable from draft (first slip) or settled (next
-// slip in the same crew's contract) — never mid-round, so an in-flight slip
-// cannot be wiped out from under the crew.
+// then arms the new round.
+//
+// The one gate on clearing is time: the previous round must be fully closed,
+// which means past its DISPUTE deadline — the last instant at which anything can
+// still happen to it. Since reveal() is bounded above by revealDeadline, which
+// is strictly earlier, seals are only ever cleared once nothing is openable.
+//
+// The gate is deliberately NOT "status must be draft or settled". settle() has a
+// hard upper bound, so a steward who misses the settle window leaves the round
+// `open` forever, and a disputed round is `disputed` forever. Gating on status
+// would make either ending brick the contract permanently — the same
+// dead-contract failure as an out-of-range deadline, reachable by simply being
+// asleep. Gating on time alone lets the crew move on while still refusing every
+// early clear:
+//
+//   status    time                          result
+//   draft     (disputeDeadline == 0)        allowed — no predecessor
+//   open      < disputeDeadline             REFUSED — picks may still be openable
+//   settled   < disputeDeadline             REFUSED — this is the wipe attack,
+//                                           and the outcome is still challengeable
+//   disputed  < disputeDeadline             REFUSED — round not closed yet
+//   any       >= disputeDeadline            allowed — round closed, however it ended
+//
 // `deadline` is seconds since the Unix epoch.
 export circuit createSlip(question: Bytes<32>, deadline: Uint<64>): [] {
   assertSteward();
-  assert(status == SlipStatus.draft || status == SlipStatus.settled, "a slip is already open");
+  // In draft this is blockTimeGte(0) — trivially true, no predecessor to guard.
+  assert(blockTimeGte(disputeDeadline), "the current slip has not closed yet");
+
   // Discloses the caller-supplied deadline. Public by design: the crew must be
   // able to see when sealing closes, and it is enforced against block time.
   const publicDeadline = disclose(deadline);
-  assert(blockTimeLt(publicDeadline), "deadline must be in the future");
+
+  // The seal window is bounded at BOTH ends. An unbounded deadline is not a
+  // cosmetic problem: reveal() and settle() are both gated on reaching it and
+  // createSlip() refuses to run while a slip is open, so a single out-of-range
+  // deadline freezes the contract and every pick in it forever.
+  //
+  // MIN_SEAL_WINDOW = 300 s (5 minutes). Block time is accurate to the scale of
+  // blocks, not seconds, and a member has to generate a ZK proof on their phone
+  // and get it propagated before sealing closes. Anything under a few minutes is
+  // a slip nobody can reliably seal into.
+  //
+  // MAX_SEAL_WINDOW = 31_536_000 s (365 days). Longer than any real group
+  // prediction, and — the reason the bound exists — it rejects a milliseconds
+  // value outright. `Date.now()` is milliseconds, `tblock` is seconds; the
+  // natural host bug passes the former, which lands ~1000x too far out (tens of
+  // thousands of years) and is caught here rather than at the point where the
+  // contract has already been bricked.
+  //
+  // Both bounds are expressed by shifting the deadline rather than reading the
+  // block clock, because there is no primitive that returns it — only the
+  // blockTime* comparisons. The `>=` guards before each subtraction keep the
+  // Uint arithmetic from underflowing; each fallback of 0 lands on the answer we
+  // want anyway (blockTimeLt(0) is always false = reject; blockTimeGte(0) is
+  // always true = a deadline under a year out cannot be too far out).
+  //
+  // Note the strictness: blockTimeLt is a strict `<`, so the floor is "more than
+  // 300 s out", not "at least". A deadline at exactly tblock + 300 is rejected.
+  // That is one second of extra conservatism on a bound whose whole purpose is
+  // to be conservative, and reaching for `!blockTimeGte(...)` to shave it would
+  // trade a clear guard for a double negative. The message says what the code
+  // does.
+  const tooSoonBound = publicDeadline >= 300 ? (publicDeadline - 300) as Uint<64> : 0 as Uint<64>;
+  assert(blockTimeLt(tooSoonBound), "deadline must be more than 5 minutes out");
+  const tooFarBound =
+          publicDeadline >= 31536000 ? (publicDeadline - 31536000) as Uint<64> : 0 as Uint<64>;
+  assert(blockTimeGte(tooFarBound),
+         "deadline must be within 365 days (seconds since epoch, not milliseconds)"
+         );
 
   seals.resetToDefault();
   reveals.resetToDefault();
@@ -204,7 +398,34 @@ export circuit createSlip(question: Bytes<32>, deadline: Uint<64>): [] {
   // text (held off-chain) so it cannot be reworded after picks are sealed.
   questionCommit = disclose(question);
   sealDeadline = publicDeadline;
-  outcome = 0 as Uint<8>;
+  // The three windows below are DIALS, and the number that matters is their sum:
+  // sealDeadline -> disputeDeadline is how long a crew must wait before starting
+  // their next slip. These defaults total 48 h, which leaves a weekly crew five
+  // clear days. A crew playing daily should shorten all three (an hour each is
+  // perfectly coherent); three generous 24 h windows would total 72 h and make
+  // the app unusable at anything faster than weekly.
+  //
+  // REVEAL_WINDOW = 86_400 s (24 h). Long enough that a member in any timezone
+  // gets a full day to open their seal, and to retry if an on-device proof
+  // fails. Reveals open the instant sealing closes, so this window is the only
+  // thing gating the crew's shared moment — it is the one that should be
+  // generous.
+  revealDeadline = (publicDeadline + 86400) as Uint<64>;
+  // SETTLE_WINDOW = 43_200 s (12 h). Half the reveal window, because settling is
+  // one tap by one known person, where revealing needs N people to each act. By
+  // the time reveals close the outcome has been knowable for a full day, so a
+  // steward who opens the app once in a normal waking day makes it.
+  settleDeadline = (publicDeadline + 86400 + 43200) as Uint<64>;
+  // DISPUTE_WINDOW = 43_200 s (12 h). Symmetric with settle, and for the same
+  // reason: challenging is also one tap, by someone who already cares enough to
+  // be watching. Anyone who opens the app once between the outcome landing and
+  // this expiring can veto it.
+  disputeDeadline = (publicDeadline + 86400 + 43200 + 43200) as Uint<64>;
+  // 2 = no outcome recorded yet. settle() overwrites it with 0 or 1 if the
+  // steward acts inside the settle window; if they do not, it stays 2 and the
+  // round closes with no result rather than a fabricated "No".
+  outcome = 2 as Uint<8>;
+  disputedBy = default<Bytes<32>>;
   status = SlipStatus.open;
 }
 
@@ -212,8 +433,16 @@ export circuit createSlip(question: Bytes<32>, deadline: Uint<64>): [] {
 // steward is what makes seals sybil-resistant: a stranger who obtains the
 // contract address still cannot seal, because only enrolled memberIds pass the
 // crew check in sealPick().
+//
+// The roster is frozen for the whole life of a slip, not merely until the seal
+// deadline. Enrolling mid-round would let the steward watch seal activity and
+// then inject confederates, and would move the denominator ("3 of 5 sealed")
+// under a crew that had already agreed who was playing. Locking at `open`
+// rather than at sealDeadline costs nothing a crew actually wants: members are
+// added between rounds, in draft or settled, which is when a crew grows.
 export circuit enrollMember(memberId: Bytes<32>): [] {
   assertSteward();
+  assert(status != SlipStatus.open, "the roster is locked while a slip is open");
   // Discloses the member's public identity. Public by design: the roster and
   // "3 of 5 sealed" progress are product surface. It is a hash of the member's
   // secret, so it identifies them without exposing anything about their picks.
@@ -244,10 +473,14 @@ export circuit sealPick(): [] {
   // Checked in-circuit so an out-of-range pick cannot produce a valid proof.
   assert(disclose(choice < 2), "pick must be 0 (No) or 1 (Yes)");
 
+  const round = roundId.read();
   // No disclose() on the commitment: persistentCommit hides its inputs, and the
   // compiler treats commitment outputs as safe to publish. This is the one value
   // that is meant to travel.
-  seals.insert(publicMemberId, pickCommitment(roundId.read(), memberId, choice, localPickSalt()));
+  seals.insert(
+    publicMemberId,
+    pickCommitment(round, memberId, choice, pickSaltOf(round, localSecretKey()))
+    );
 }
 
 // Open a sealed pick after the deadline. The contract re-derives the commitment
@@ -255,9 +488,15 @@ export circuit sealPick(): [] {
 // ever open to the pick they actually sealed.
 export circuit reveal(): [] {
   assert(status != SlipStatus.draft, "no slip to reveal");
-  // Revealing opens exactly when sealing closes — enforced against block time,
-  // so nobody can open early and nobody has to wait on the steward.
-  assert(blockTimeGte(sealDeadline), "reveals open after the deadline");
+  // Revealing opens at the exact instant sealing closes. This is the product's
+  // signature moment — the crew opens together, on the clock, with nobody
+  // waiting on the steward and nobody able to open early. Enforced against block
+  // time, so it happens whether or not any privileged party is online.
+  assert(blockTimeGte(sealDeadline), "reveals open at the seal deadline");
+  // ...and close at revealDeadline. This upper bound is what lets createSlip()
+  // clear seals safely: past this point no reveal can succeed anyway, so
+  // clearing takes nothing openable away from anyone.
+  assert(blockTimeLt(revealDeadline), "the reveal window has closed");
 
   const memberId = memberIdOf(localSecretKey());
   // Discloses which member is revealing. Public by design: an opened pick is
@@ -267,10 +506,21 @@ export circuit reveal(): [] {
   assert(!reveals.member(publicMemberId), "already revealed this round");
 
   const choice = localPick();
-  const recomputed = pickCommitment(roundId.read(), memberId, choice, localPickSalt());
+  // Defence in depth. The commitment re-derivation below already makes an
+  // out-of-range choice impossible to open with (sealPick() range-checked it
+  // before committing, so no commitment exists for choice >= 2). Asserting it
+  // here anyway means the `else` branch of the tally can never quietly become a
+  // catch-all if that transitive argument is ever broken by a later change.
+  // Discloses only the boolean "the opening is a legal side".
+  assert(disclose(choice < 2), "pick must be 0 (No) or 1 (Yes)");
+
+  const round = roundId.read();
+  const recomputed = pickCommitment(round, memberId, choice, pickSaltOf(round, localSecretKey()));
   // Discloses only the boolean "this opening matches the seal". A false value
-  // aborts the transaction, so a wrong choice or a wrong salt cannot be smoothed
-  // over by the client.
+  // aborts the transaction, so a flipped choice cannot be smoothed over by the
+  // client. (A "wrong salt" is no longer a reachable failure: the salt is
+  // derived from the same device secret that produced memberId, so a caller who
+  // gets past the membership check necessarily re-derives the right one.)
   assert(disclose(recomputed == seals.lookup(publicMemberId)), "reveal does not match the seal");
 
   // Discloses the choice. Intended and central: after the deadline the pick
@@ -284,18 +534,79 @@ export circuit reveal(): [] {
   }
 }
 
-// Steward records the real-world outcome. Scores are not stored: every input to
-// them (each member's revealed choice, and the outcome) is already public, so a
-// client computes the scoreboard deterministically from ledger state. Keeping it
-// off-chain avoids a per-member loop in-circuit and keeps this circuit small.
+// Steward records the real-world outcome, after reveals have closed. Scores are
+// not stored: every input to them (each member's revealed choice, and the
+// outcome) is already public, so a client computes the scoreboard
+// deterministically from ledger state. Keeping it off-chain avoids a per-member
+// loop in-circuit and keeps this circuit small.
+//
+// The steward is NOT trusted to be honest here — they are trusted only to be
+// prompt. Honesty is enforced afterwards by dispute(), because the outcome is a
+// real-world fact the whole crew can check independently.
 export circuit settle(result: Uint<8>): [] {
   assertSteward();
   assert(status == SlipStatus.open, "no open slip to settle");
-  assert(blockTimeGte(sealDeadline), "cannot settle before the deadline");
+  // Lower bound: not before reveals have closed. Recording the outcome mid-
+  // reveal would let the steward's result land while members are still deciding
+  // whether to open, which changes what opening means.
+  assert(blockTimeGte(revealDeadline), "cannot settle before reveals close");
+  // Upper bound. An unbounded settle is exactly how the original never-ending
+  // round bug arose: with no upper bound the round has no last instant, so there
+  // is no safe time to clear it and nothing downstream can be gated. Bounded, a
+  // steward who goes quiet costs the round its result and nothing more.
+  assert(blockTimeLt(settleDeadline), "the settle window has closed");
   // Discloses the outcome the steward is recording. Public by design: it is the
   // shared result the whole crew is scored against.
   const publicResult = disclose(result);
   assert(publicResult < 2, "outcome must be 0 (No) or 1 (Yes)");
   outcome = publicResult;
   status = SlipStatus.settled;
+}
+
+// Any member who sealed this round may challenge the recorded outcome, voiding
+// it. This is the contract's answer to the central threat: the steward lying
+// about a fact the whole crew can verify.
+//
+// One dispute is enough, and that is the point. The outcome is a public
+// real-world fact — everybody can see whether it rained — so a single honest
+// participant suffices, and no quorum, stake or tie-break is needed. Requiring
+// agreement would only give a dishonest steward something to divide.
+//
+// Eligibility is "sealed this round", NOT "revealed this round". A member who
+// missed the reveal window can still see the outcome is wrong, and has just as
+// much standing to say so; requiring a reveal would silently disenfranchise
+// exactly the people least able to keep up, and would let a steward time a false
+// outcome against a crew they know is unlikely to open.
+//
+// Wave 1 voids and stops there — no re-settle, because a steward who could
+// re-settle after a challenge could simply re-post the same lie until the
+// dispute window ran out. The Wave 2 path is escalation to majority attestation
+// among the members who sealed, rather than a straight void: same eligibility
+// set, a real result instead of a hole, and the steward demoted from author to
+// proposer. That needs a second round of interaction and per-member state this
+// circuit deliberately does not carry yet.
+export circuit dispute(): [] {
+  // Only a recorded outcome can be challenged. A round nobody settled has
+  // nothing to dispute — it already has no result.
+  assert(status == SlipStatus.settled, "there is no recorded outcome to dispute");
+  assert(blockTimeLt(disputeDeadline), "the dispute window has closed");
+
+  const memberId = memberIdOf(localSecretKey());
+  // Discloses which member is disputing. Public by design, and load-bearing: a
+  // dispute is meant to be attributable. It costs the round its result, so the
+  // crew gets to see who did it and judge them for it — that visibility is most
+  // of what deters a frivolous challenge.
+  const publicMemberId = disclose(memberId);
+  assert(crew.member(publicMemberId), "not in this crew");
+  // Participation requirement. Sealing is the stake here: only someone who
+  // committed a pick before the outcome was known gets a veto over it. Without
+  // this an enrolled bystander who risked nothing could void other people's
+  // rounds.
+  assert(seals.member(publicMemberId), "did not seal this round");
+
+  // 3, not 2: this round HAD an outcome and the crew rejected it. That is a
+  // different story from a steward who never showed up, and the UI says so.
+  outcome = 3 as Uint<8>;
+  disputedBy = publicMemberId;
+  status = SlipStatus.disputed;
 }

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "midnight": {
+      "type": "http",
+      "url": "https://midnight.mcp.kapa.ai"
+    },
+    "octocode-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "octocode-mcp"
+      ],
+      "env": {}
+    }
+  }
+}
