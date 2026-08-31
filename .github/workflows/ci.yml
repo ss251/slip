@@ -84,11 +84,18 @@ jobs:
           for i in $(seq 1 60); do
             curl -sf -o /dev/null http://localhost:9944/health && break; sleep 5
           done
+      - name: Use Node 22 (midnight-js v5 requires >= 22.12)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Deploy + call on-chain
         working-directory: contracts
         run: |
           if ! grep -q '"test:network"' package.json; then echo "no network tests yet — skipping"; exit 0; fi
-          npm install && npm run build && npm run test:network
+          # test:network builds with ZK keys, links the build into e2e/, installs that
+          # workspace (midnight-js v5 beta, kept separate from the simulator's pins),
+          # then deploys and calls.
+          npm install && npm run test:network
       - name: Devnet logs on failure
         if: failure()
         run: docker compose -f infra/devnet-compose.yml -p slip-devnet logs --tail 80

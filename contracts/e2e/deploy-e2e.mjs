@@ -1,7 +1,9 @@
 // Network e2e: deploys slip.compact to the local ledger-9 devnet and calls a
 // circuit, proving the contract works on a chain rather than only in the simulator.
 //
-// Requires infra/devnet-compose.yml to be up (node 2.0.0-rc.3 / ledger 9). Uses the
+// Run from contracts/: `npm run test:network` (builds with ZK keys, links the build
+// in, installs this workspace, then runs). Requires infra/devnet-compose.yml up
+// (`npm run devnet:up`). Uses the
 // midnight-js 5.0.0-beta line, the only published stack that consumes compiler-0.34.0
 // artifacts; midnight-js 4.1.1 hard-pins compact-runtime 0.16.0 and cannot load them.
 //
@@ -16,7 +18,7 @@ import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { ttlOneHour } from '@midnight-ntwrk/midnight-js-utils';
 import { ZswapSecretKeys, DustSecretKey, LedgerParameters } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 import { FluentWalletBuilder } from '@midnight-ntwrk/testkit-js';
-import { Contract, ledger } from './slip-build/contract/index.js';
+import { Contract, ledger } from './slip-build/contract/index.js'; // linked by link-build.mjs
 import path from 'node:path';
 import pino from 'pino';
 

@@ -1,0 +1,6 @@
+# e2e workspace artifacts (deps are the midnight-js v5 beta line; slip-build is a
+# copy of ../build made by link-build.mjs; midnight-level-db is the private-state
+# store the run creates)
+e2e/node_modules/
+e2e/slip-build/
+e2e/midnight-level-db/

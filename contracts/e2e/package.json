@@ -1,0 +1,24 @@
+{
+  "name": "slip-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Network e2e: deploy slip.compact to the local ledger-9 devnet and call a circuit. Deliberately a SEPARATE workspace from ../package.json: the midnight-js v5 line resolves compact-runtime 0.19.0-rc.0, while the simulator tests pin the released 0.19.0 that our compiler names. Keeping them apart stops the rc leaking into the tested path (and into the freshness gate's pin check).",
+  "scripts": {
+    "pretest": "node link-build.mjs",
+    "test": "node deploy-e2e.mjs"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/midnight-js-contracts": "5.0.0-beta.7",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "5.0.0-beta.7",
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "5.0.0-beta.7",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "5.0.0-beta.7",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "5.0.0-beta.7",
+    "@midnight-ntwrk/midnight-js-network-id": "5.0.0-beta.7",
+    "@midnight-ntwrk/midnight-js-types": "5.0.0-beta.7",
+    "@midnight-ntwrk/midnight-js-utils": "5.0.0-beta.7",
+    "@midnight-ntwrk/testkit-js": "5.0.0-beta.7",
+    "pino": "^9.5.0",
+    "pino-pretty": "^13.0.0",
+    "rxjs": "^7.8.1"
+  }
+}

@@ -10,7 +10,7 @@
     "test": "node test/slip.test.mjs && node test/leak.mjs",
     "devnet:up": "docker compose -f ../infra/devnet-compose.yml -p slip-devnet up -d",
     "devnet:down": "docker compose -f ../infra/devnet-compose.yml -p slip-devnet down",
-    "test:network": "node scripts/deploy-e2e.mjs"
+    "test:network": "npm run build && cd e2e && npm install && npm test"
   },
   "dependencies": {
     "@midnight-ntwrk/compact-runtime": "0.19.0",
