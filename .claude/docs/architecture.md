@@ -15,7 +15,13 @@ Midnight network (dev: `undeployed` local trio)
  └─ slip.compact — ONE contract: rounds, commitments, deadline, reveals, scores
 ```
 
-The defining decision: **standard Midnight apps delegate proving to a proof server, which necessarily receives witness data. Slip's prover runs on the phone**, so the privacy claim ("nobody can see a sealed pick") is architecturally true, not policy-true.
+The defining decision: **Slip proves in-process on the phone.** State the reason precisely, because the sloppy version is wrong and a judge will catch it:
+
+- Proving genuinely requires the witness in the clear. Official docs: *"the proof server performs arithmetic directly over those values, so whichever proof server does the proving receives them in the clear... It is a trust boundary."*
+- **But a locally-run proof server is already private** — the docs call `localhost:6300` "the safe default", and 1AM already proves in-browser via WASM. On-device proving is not unprecedented, and desktop DApps are not leaking by default. Do not claim otherwise.
+- **The gap is mobile.** You cannot run the Docker proof server on an iPhone, so a mobile Midnight app's realistic options are a *remote* proof server that sees every witness, or proving in-process. Slip does the latter.
+
+So the honest claim is: *on iOS*, a sealed pick never leaves the device, and that is architecturally true rather than policy-true. Scope it to mobile and it holds; generalise it to "everyone else leaks" and it is false.
 
 ## Contract interface (target shape — keep circuits few and small)
 
@@ -25,13 +31,88 @@ The defining decision: **standard Midnight apps delegate proving to a proof serv
 - `settle(round, outcome)` — steward-only; scores computed from verified reveals.
 
 Constraints that shape this design:
-- **No contract-to-contract calls on the network yet** → everything above lives in one contract.
+- **Single contract by choice, not by force.** Cross-contract calls *are* supported as of Compact
+  toolchain 0.33.0 (we run 0.34.0); `crossContractCall()` ships in `compact-runtime` 0.19.0, our
+  pinned runtime, and midnight-js v5 assembles/proves/submits call trees. (The docs page
+  `how-midnight-works/building-blocks` still says otherwise — it is stale, as it also is on
+  transaction merging.) We stay single-contract because it is simpler, keeps proving cheap, and
+  avoids the real constraints that come with call trees: an exported circuit reachable by a
+  cross-contract call **cannot call witnesses**, cycles are undefined, and callee artifacts must
+  ship alongside the caller. Revisit only if escrow genuinely needs its own contract.
 - Circuit size stays small (k≈10 class) → proving in ~100ms-class on device and tiny params. Don't add circuit complexity without re-checking `midnightkit.md` budgets.
 - Public ledger state is public: question commitment, seal commitments, reveal results, scores. Sides are hidden **until reveal, then public to the crew and chain** — that's the product contract, don't accidentally promise more.
 
 ## Crew membership & invites (v1)
 
-Invite link carries the contract address + round id (+ crew secret for membership proof if enabled). No backend service in v1: rendezvous is the chain itself; the app polls the indexer for roster/reveal state. Push/notifications come later and must not require witness-adjacent data.
+Invite link carries the contract address + round id (+ crew secret for membership proof if enabled). Rendezvous is the chain itself; the app polls the indexer for roster/reveal state. **Caveat: "no backend" no longer survives contact with fees.** Every circuit call costs DUST, and DUST sponsorship — the mechanism that lets a member transact holding nothing — requires a sponsor *wallet*, which the protocol will not let a contract be (*"Smart contracts do not hold or spend DUST"*). **Decided: DUST redesignation, no sponsor service.** See below. Push/notifications come later and must not require witness-adjacent data.
+
+## How members pay for transactions
+
+Every circuit call costs DUST and the protocol will not let a contract hold any
+(*"Smart contracts do not hold or spend DUST"*), so someone funds the crew. Two
+mechanisms exist; we take the second.
+
+**Rejected — sponsor service.** A backend holds NIGHT and attaches a DUST fee
+offer to each member's already-bound transaction (`balanceFinalizedTransaction`
+with `tokenKindsToBalance: ['dust']`). Members hold nothing and one sponsor
+address serves unlimited members, because the sponsor spends its *own* DUST
+rather than delegating any. It is the documented pattern with a reference
+implementation. Rejected because it is a server: hosting, uptime during judging,
+and a party who can decline to relay — a bad shape for an app whose claim is that
+no one can interfere with a sealed pick. Its real ceiling is capacity, not
+addressing: DUST refills toward ~5 per NIGHT over roughly a week, so a busy
+sponsor runs dry.
+
+**Chosen — DUST generation redesignation.** The steward points DUST generation at
+each member's own DUST address via
+`registerNightUtxosForDustGeneration(utxos, vk, sign, receiverDustAddress)`.
+Members then pay their own fees while never holding NIGHT.
+
+Measured on the local devnet (`scripts/measure-redesignation.ts`): a wallet
+holding **zero NIGHT and zero DUST had spendable DUST 18.8s** after the steward
+registered — 15.8s to submit, ~3s to appear. That cost lands at *enrollment*, not
+at seal time, which is what makes this viable.
+
+Three implementation traps, each found by hitting it:
+
+1. **Registration is scoped to a Night ADDRESS, not a UTXO.** The ledger holds
+   `address_delegation: Map<NightAddress, DustPublicKey>` — one address maps to
+   exactly one DUST key. Respending NIGHT at a registered address yields
+   *already-registered* UTXOs. Consequence: **the steward needs one Night address
+   per member**, derived from the HD path `m/44'/2400'/account'/role/index`,
+   each funded and registered separately at crew setup. Redesignating from a
+   single address would redirect the steward's own generation away from itself.
+2. **Redesignation must be explicitly DUST-balanced** before finalizing
+   (`balanceUnprovenTransaction(..., tokenKindsToBalance: ['dust'])`). Plain
+   self-registration self-funds from retroactive DUST; pointing generation at a
+   third party does not. Skipping this gives `Malformed(BalanceCheckOverspend)`.
+3. **Do not sign twice.** `registerNightUtxosForDustGeneration` already signs via
+   its `signDustRegistration` callback; a following `signRecipe` produces
+   `Malformed(InputsSignaturesLengthMismatch)`.
+
+**Not yet proven:** the N-member case end to end. Address-scoping is read from the
+ledger spec and corroborated by the cNIGHT proposal ("at most one registration per
+wallet address"), not demonstrated with several members. Also untested on
+`preview`/`preprod`, where funding comes from a human-facing faucet page rather
+than a genesis wallet — that, not latency, is the risk that could push us back to
+a sponsor service.
+
+## Stakes and offramping
+
+**Stakes are a contract-minted token with no offramp, by design.** Not a
+limitation we are working around — the exit does not exist: the Cardano bridge is
+**one-way at mainnet launch** (*"there will not be, by mainnet launch, a
+protocol-level bridging mechanism... from Midnight to Cardano"*), and DUST can
+never be a stake (non-transferable, decays, *"cannot store value"* — deliberately,
+for regulatory reasons). So value landing on Midnight has no sanctioned route out
+regardless of what we build.
+
+Every cryptographic property, the escrow, the sealed pot and the claim flow work
+identically with a valueless token; what changes is that nothing converts to
+money, which keeps Slip a game rather than a licensed betting operator. Real
+money is a post-mainnet, licensed-entity conversation — pooled wagering with
+payout is gambling plus money transmission in most jurisdictions, and App Store
+real-money gaming requires per-territory licensed entities.
 
 ## Round lifecycle — four phases
 

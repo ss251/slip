@@ -45,7 +45,7 @@ Canonical shapes (compile syntax confirmed against official Midnight CI and the 
 
 ## Hard constraints — do not design around these, design *with* them
 
-- **Single contract.** The network does not support contract-to-contract calls yet (arriving in a future quarter). Everything lives in one Compact contract.
+- **Single contract — our choice, not a platform limit.** Cross-contract calls shipped in Compact toolchain 0.33.0 (we run 0.34.0) and `crossContractCall()` is in our pinned runtime 0.19.0. We stay single-contract for proving cost and simplicity; a circuit reachable cross-contract also cannot call witnesses, which our design needs. Don't repeat the "not supported yet" line — it is stale.
 - **The witness never leaves the device.** A pick is `{choice, salt}` witness data. It must never be logged, sent, persisted unencrypted, or included in analytics (there are none). Only the zero-knowledge proof and the commitment travel. This is the product; treat any violation as a release blocker.
 - **Wave 1 is unitless.** No tokens, no stakes, no monetary value — points and banter only. Do not add value transfer without reading `.claude/docs/roadmap.md`.
 - **Reveals must verify.** A reveal that doesn't match its commitment is rejected by the contract, not smoothed over by the client.

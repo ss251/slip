@@ -11,7 +11,12 @@
 
 ## MCP servers (committed — no setup command needed)
 
-Both live in `.mcp.json` at the repo root, so cloning the repo is the install. Claude Code picks them up **at session start** — if you add or change one mid-session, restart the session or it will not appear in `/mcp` (the config is right; the running session simply bound its servers at launch). Subagents spawn fresh and do see current config, which can make this confusing to diagnose.
+Both live in `.mcp.json` at the repo root, so cloning the repo is the install. Two conditions must BOTH hold or the tools silently do not exist:
+
+1. **The session must have been launched from inside this repo.** `.mcp.json` is *project-scoped*. A session started in `~` never loads it — `claude mcp list` run from `~` shows no entries at all, while the same command run from the repo shows them connected. `cd`-ing mid-session does not fix it.
+2. **Servers bind at session start.** Adding or changing one mid-session requires a restart.
+
+So the fix for "kapa isn't there" is almost always `cd ~/Developer/slip && claude`, not re-auth. Diagnose with `claude mcp list` **run from the repo directory** — it reports true connection state (`✔ Connected` / `⏸ Pending approval`) independently of what the running session bound. Spawning a subagent is *not* a confirmed workaround for a wrong launch directory — one attempt with a wrongly-launched parent came back reporting the server unavailable, though that run was also genuinely unapproved at the time, so the two causes were not separable. Relaunch rather than relying on it.
 
 | server | what it answers | notes |
 |---|---|---|
