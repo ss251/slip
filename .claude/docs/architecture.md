@@ -271,8 +271,8 @@ so clients compute the scoreboard deterministically from ledger state.
 
 `undeployed` is the target, not a stepping stone — the kickoff scopes the buildathon
 to it explicitly (*"I highly encourage you to stick to undeployed... you can do all of
-that without waiting for network syncs, without having to deal with faucets"*). Judges
-do not verify a testnet address, which is what makes staying on ledger 9 safe.
+that without waiting for network syncs, without having to deal with faucets"*). Judges do not verify a testnet address, so a local demo is sufficient — but we build
+on the supported stack anyway, so preview/preprod stay open to us.
 
 Bring it up with `npm run devnet:up` (contracts/) — `infra/devnet-compose.yml`. Node
 `ws://localhost:9944`, indexer `http://localhost:8088/api/v4/graphql`, proof server

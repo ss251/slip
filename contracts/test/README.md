@@ -145,7 +145,7 @@ compact compile contracts/slip.compact contracts/build
 
 mkdir -p /tmp/slip-sim && cd /tmp/slip-sim
 npm init -y
-npm install @midnight-ntwrk/compact-runtime@0.19.0 @midnight-ntwrk/midnight-js-network-id
+npm install @midnight-ntwrk/compact-runtime@0.16.0 @midnight-ntwrk/midnight-js-network-id
 cp -R <repo>/contracts/build/contract ./slipcontract
 echo '{"type":"module"}' > slipcontract/package.json   # generated code is ESM
 cp <repo>/contracts/test/*.mjs .

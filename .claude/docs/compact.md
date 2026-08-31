@@ -10,7 +10,7 @@ Private data enters via **witnesses** (implemented host-side, returning `[newPri
 ## Program anatomy
 
 ```compact
-pragma language_version >= 0.26;      // verified 2026-08-31 on compiler 0.34.0 / language 0.26.0
+pragma language_version >= 0.23;      // verified 2026-08-31 on compiler 0.31.1 / language 0.23.0
 import CompactStandardLibrary;         // always
 
 export ledger round_commitments: ...;  // public, on-chain state
@@ -44,7 +44,7 @@ export circuit sealPick(...): [] {
 
 `scripts/freshness-gate.sh` is the source of truth. Two rules it encodes, both learned the hard way:
 - **The compiler decides the runtime version, not npm.** Pin `@midnight-ntwrk/compact-runtime` to `compact compile -- --runtime-version`. npm `latest` runs ahead of released compilers; a doc's hardcoded ceiling is written against *its* compiler, not yours.
-- **A vendored example is a pattern, not a fact.** Examples predate the current language (0.23 -> 0.26 moved under us). The compiler is the referee; the Midnight Expert verify loop is how you ask it.
+- **A vendored example is a pattern, not a fact.** Examples drift against the language in both directions — many are written for 0.26+, which our supported 0.23 compiler rejects outright. The compiler is the referee; the Midnight Expert verify loop is how you ask it.
 
 ## References (fetchable as raw markdown)
 
