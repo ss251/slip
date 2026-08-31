@@ -70,7 +70,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Local network round-trip (arm when e2e exists)
+      - name: Set up Compact toolchain
+        uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8 # v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          compact-version: ${{ env.COMPACT_COMPILER_VERSION }}
+      - name: Start ledger-9 devnet
         run: |
-          if [ ! -f package.json ] || ! grep -q '"test:network"' package.json; then echo "no network tests yet — skipping"; exit 0; fi
-          npm ci && npm run test:network
+          docker compose -f infra/devnet-compose.yml -p slip-devnet up -d
+          # the node must speak ledger 9 (spec_version >= 2_000_000) or the wallet
+          # stack fails opaquely; freshness-gate.sh asserts this too.
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:9944/health && break; sleep 5
+          done
+      - name: Deploy + call on-chain
+        working-directory: contracts
+        run: |
+          if ! grep -q '"test:network"' package.json; then echo "no network tests yet — skipping"; exit 0; fi
+          npm install && npm run build && npm run test:network
+      - name: Devnet logs on failure
+        if: failure()
+        run: docker compose -f infra/devnet-compose.yml -p slip-devnet logs --tail 80
+      - name: Tear down
+        if: always()
+        run: docker compose -f infra/devnet-compose.yml -p slip-devnet down

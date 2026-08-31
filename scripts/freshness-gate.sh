@@ -78,12 +78,47 @@ if [ -f AGENTS.md ] && [ -n "$COMPILER" ]; then
     || FAIL "AGENTS.md does not mention compiler $COMPILER — update the verified-stack line when the toolchain moves"
 fi
 
+# --- FAIL 5: the devnet must speak the ledger our compiler targets.
+# Compact 0.34.0 emits ledger-9 code; ledger 9 ships with midnight-node 2.x
+# (spec_version 2_000_000). Against a node 1.x devnet the wallet stack dies as
+# "Failed to decode ledger event payload" and never mentions a version, so check
+# it here instead of losing an afternoon to it. Only runs if a devnet is up.
+if command -v curl >/dev/null 2>&1 && curl -sf -o /dev/null --max-time 2 http://localhost:9944/health 2>/dev/null; then
+  SPEC=$(curl -sf --max-time 5 -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"state_getRuntimeVersion","params":[]}' \
+    http://localhost:9944 2>/dev/null | grep -oE '"specVersion":[0-9]+' | grep -oE '[0-9]+$')
+  if [ -n "$SPEC" ]; then
+    if [ "$SPEC" -ge 2000000 ] 2>/dev/null; then
+      OK "devnet speaks ledger 9 (spec_version $SPEC) — matches compiler $COMPILER"
+    else
+      FAIL "devnet spec_version $SPEC is the ledger-8 line, but compiler $COMPILER emits ledger-9 code. Start infra/devnet-compose.yml (node 2.x) — a node 1.x devnet fails opaquely as 'Failed to decode ledger event payload'"
+    fi
+  else
+    WARN "devnet is up but did not report a spec_version — cannot confirm it speaks ledger 9"
+  fi
+fi
+
 [ "$NO_NET" = "1" ] && { echo; [ "$fail" = "0" ] && echo "freshness gate: PASS (local checks only)" || echo "freshness gate: FAIL"; exit $fail; }
 
 # --- WARN: the world moved. Network checks, never fatal.
 UP=$(compact check 2>/dev/null | grep -oE 'Latest version available: [0-9.]+' | grep -oE '[0-9.]+$')
 [ -n "$UP" ] && [ "$UP" != "$COMPILER" ] && WARN "compiler $COMPILER installed, $UP available — 'compact update' (language may move too; re-verify examples)"
 compact self check 2>/dev/null | grep -qi "update available" && WARN "Compact CLI update available — 'compact self update'"
+
+# npm 'latest' is NOT authoritative here — it has shipped behind the version the
+# official examples pin (wallet-sdk 'latest' was 1.1.0 while 1.2.0 was required, and
+# 1.1.0 cannot decode ledger-9 events). Surface the gap; never auto-follow latest.
+if [ -f contracts/package.json ]; then
+  for pkg in @midnight-ntwrk/compact-runtime; do
+    LOCAL=$(grep -oE "\"$pkg\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" contracts/package.json 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/' | tr -d '^~')
+    [ -z "$LOCAL" ] && continue
+    LATEST=$(npm view "$pkg" version 2>/dev/null | tr -d '[:space:]')
+    [ -z "$LATEST" ] && continue
+    if [ "$LATEST" != "$LOCAL" ]; then
+      WARN "$pkg: we pin $LOCAL (what our compiler emits), npm latest is $LATEST — this is EXPECTED while npm lags; do NOT 'fix' it by following latest"
+    fi
+  done
+fi
 
 # vendored skills: compare by COMMIT against upstream, never by a version file
 for s in .claude/skills/*/SOURCE.md; do

@@ -1,0 +1,34 @@
+# Slip's canonical local devnet — the `undeployed` network the buildathon targets.
+#
+# WHY THESE EXACT TAGS: our contract is compiled by Compact 0.34.0, which emits code
+# for ledger 9 / compact-runtime 0.19.0. Ledger 9 arrives with midnight-node 2.0.0
+# (spec_version 1_000_000 -> 2_000_000). A node 1.x devnet reports protocol
+# V1_0(1000000) and the v5 wallet stack cannot decode its events — it fails as
+# "Failed to decode ledger event payload", never mentioning a version. Verified
+# working: deploy + createSlip succeed against this stack (contracts/scripts/deploy-e2e.mjs).
+#
+# There is NO ledger 8 -> 9 migration; node 2.x starts a fresh chain by design.
+# Every public network (preview/preprod/mainnet) still runs the ledger-8 stack, so
+# this contract is only deployable locally today. That is fine: the kickoff scopes
+# the buildathon to `undeployed` ("I highly encourage you to stick to undeployed").
+services:
+  proof-server:
+    image: 'midnightntwrk/proof-server:9.0.0-rc.4'
+    ports: ['127.0.0.1:6300:6300']
+    environment: { RUST_BACKTRACE: 'full' }
+    command: ['midnight-proof-server', '--verbose']
+  indexer:
+    image: 'midnightntwrk/indexer-standalone:4.4.0-pre-alpha.16-l91r3-n2r3-bridge-and-events-epics-contract-zswap-16c656df'
+    ports: ['127.0.0.1:8088:8088']
+    environment:
+      RUST_LOG: 'indexer=info,chain_indexer=info,indexer_api=info,wallet_indexer=info,indexer_common=info,fastrace_opentelemetry=off,info'
+      APP__INFRA__SECRET: '303132333435363738393031323334353637383930313233343536373839303132'
+      APP__INFRA__NODE__URL: 'ws://node:9944'
+      # This indexer build carries the Cardano-bridge epic and requires the key even
+      # though the bridge is inert locally (node 2.0.0 ships it disabled).
+      APP__INFRA__SPO_NODE__BLOCKFROST_ID: 'local-devnet-unused'
+  node:
+    image: 'midnightntwrk/midnight-node:2.0.0-rc.3'
+    ports: ['127.0.0.1:9944:9944']
+    environment:
+      CFG_PRESET: 'dev'

@@ -282,4 +282,26 @@ so clients compute the scoreboard deterministically from ledger state.
 
 ## Local development
 
-`undeployed` network via midnight-local-dev: node `ws://localhost:9944`, indexer `http://localhost:8088/api/v4/graphql`, proof server `http://localhost:6300`. The proof server exists for tooling/CLI parity only — the app path must never depend on it. Preprod/testnet deploys are a milestone step, not the daily loop.
+`undeployed` is the target, not a stepping stone — the kickoff scopes the buildathon
+to it explicitly (*"I highly encourage you to stick to undeployed... you can do all of
+that without waiting for network syncs, without having to deal with faucets"*). Judges
+do not verify a testnet address, which is what makes staying on ledger 9 safe.
+
+Bring it up with `npm run devnet:up` (contracts/) — `infra/devnet-compose.yml`. Node
+`ws://localhost:9944`, indexer `http://localhost:8088/api/v4/graphql`, proof server
+`http://localhost:6300`. The proof server is for tooling/CLI parity only; the app path
+must never depend on it.
+
+**The node version is load-bearing.** Our contract is ledger 9 (Compact 0.34.0), which
+means midnight-node **2.x** — node 1.x is the ledger-8 line and the wallet stack fails
+against it as "Failed to decode ledger event payload" with no mention of a version.
+`freshness-gate.sh` now checks the running devnet's `spec_version` (>= 2_000_000).
+
+**Proven on-chain** (`npm run test:network`, 2026-08-31): deployed at
+`80fb9cf2…bae1ef74` in 21.8s, `createSlip` returned `SucceedEntirely` in 17.3s, ledger
+advanced `status 0 -> 1` with `sealDeadline` written. A real proof was generated and
+verified by the network, so the contract is no longer compiler-and-simulator only.
+
+Public networks (preview/preprod/mainnet) all still run the ledger-8 stack (Compact
+0.31.1 / runtime 0.16.0 / midnight-js 4.1.1), so this contract is not deployable there
+without a port. Deliberate, not an oversight — see the toolchain stack fork above.
