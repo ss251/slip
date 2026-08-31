@@ -13,7 +13,7 @@ on:
   pull_request:
 
 env:
-  COMPACT_COMPILER_VERSION: "0.30.0" # version exercised in official CI; bump deliberately with the compatibility matrix
+  COMPACT_COMPILER_VERSION: "0.34.0" # what we build against locally (language 0.26.0, ledger 9.1.0.0-rc.3, runtime 0.19.0); bump deliberately with the compatibility matrix
 
 jobs:
   design-gate:

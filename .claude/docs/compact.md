@@ -10,7 +10,7 @@ Private data enters via **witnesses** (implemented host-side, returning `[newPri
 ## Program anatomy
 
 ```compact
-pragma language_version >= 0.23;      // toolchain 0.31.x current
+pragma language_version >= 0.26;      // verified 2026-08-31 on compiler 0.34.0 / language 0.26.0
 import CompactStandardLibrary;         // always
 
 export ledger round_commitments: ...;  // public, on-chain state

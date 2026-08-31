@@ -28,7 +28,7 @@ docs/how-slip-works.html  interactive end-to-end explainer (self-contained)
 
 ## Setup
 
-1. Compact toolchain: install the `compact` CLI, run `compact update` (toolchain 0.31.x; contracts use `pragma language_version >= 0.23`). Verify exact compile invocation with `compact help` before scripting it.
+1. Compact toolchain: install the `compact` CLI, then `compact self update && compact update`. Verified stack as of 2026-08-31: **CLI 0.5.2 · compiler 0.34.0 · language 0.26.0 · ledger 9.1.0.0-rc.3 · runtime 0.19.0**. The toolchain moves fast and breaks — re-run `compact check` / `compact self check` before a build session, and treat any pre-0.26 language example (including vendored ones) as suspect until it compiles.
 2. Local network + proof server: Docker-based `midnight-local-dev` (see `.claude/docs/resources.md`).
 3. Xcode 26 / Swift 6 toolchain; Rust with `aarch64-apple-ios` and `aarch64-apple-ios-sim` targets for MidnightKit work.
 4. AI assistance: install the official **Midnight Expert** plugins (`claude plugin marketplace add https://midnightntwrk.expert`) — they verify generated Compact against the real compiler. This repo also ships a knowledge skill at `.claude/skills/midnight-compact/` (vendored from adavault/midnight-skill, MIT): 30 compiler-validated example contracts — including commit-reveal and prediction-market shapes — plus a long gotchas reference. Use the skill for patterns, the plugin for verification. The docs index for LLMs is `https://docs.midnight.network/llms.txt`.
