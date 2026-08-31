@@ -65,13 +65,17 @@ let state, priv;
 
 async function call(sk, pick, id, timeSeconds, ...args) {
   const c = new Contract(w(sk, pick));
+  // runtime 0.16.0 signature: (contractAddress, coinPublicKey, contractState,
+  // privateState, gasLimit?, costModel?, time?). It differs from 0.19.0's, which
+  // takes a leading circuit id — if you move the toolchain, re-read
+  // compact-runtime/dist/circuit-context.d.ts rather than assuming.
   const ctx = rt.createCircuitContext(
-    id, ADDR, CPK, state, priv,
-    undefined, undefined, undefined, timeSeconds, undefined, undefined
+    ADDR, CPK, state, priv,
+    undefined, undefined, timeSeconds
   );
   const res = await c.impureCircuits[id](ctx, ...args);
-  state = res.context.callContext.currentQueryContext.state;
-  priv = res.context.callContext.currentPrivateState;
+  state = res.context.currentQueryContext.state;
+  priv = res.context.currentPrivateState;
   return res;
 }
 

@@ -4,7 +4,13 @@ import { Contract, ledger, pureCircuits } from './slipcontract/index.js';
 setNetworkId('undeployed');
 
 const ADDR = rt.sampleContractAddress(), CPK = { bytes: new Uint8Array(32) };
-const k = (b) => { const x = new Uint8Array(32); x[0] = b; return x; };
+// FULL-ENTROPY test secrets, deliberately. AlignedValue encodes a Bytes<32> with
+// trailing zeros TRIMMED — a secret of [0x02, 0x00 x31] serializes as "02" with
+// alignment {bytes, length: 32}. Searching the transcript for the full 64-char hex
+// of such a value can never match, so the leak check would pass vacuously. Filling
+// all 32 bytes keeps the encoded form byte-identical to what we search for. The
+// positive control below is what caught this.
+const k = (b) => new Uint8Array(32).fill(b);
 const STEWARD = k(1), ALICE = k(2);
 
 // Unix SECONDS — the unit the ledger's `secondsSinceEpoch` field actually means.
@@ -18,10 +24,11 @@ const w = (sk, p) => ({
 let state, priv;
 async function call(sk, p, id, t, ...a) {
   const c = new Contract(w(sk, p));
-  const ctx = rt.createCircuitContext(id, ADDR, CPK, state, priv, undefined, undefined, undefined, t, undefined, undefined);
+  // runtime 0.16.0 signature — see the note in slip.test.mjs
+  const ctx = rt.createCircuitContext(ADDR, CPK, state, priv, undefined, undefined, t);
   const r = await c.impureCircuits[id](ctx, ...a);
-  state = r.context.callContext.currentQueryContext.state;
-  priv = r.context.callContext.currentPrivateState;
+  state = r.context.currentQueryContext.state;
+  priv = r.context.currentPrivateState;
   return r;
 }
 
@@ -39,13 +46,31 @@ await call(STEWARD, 0n, 'createSlip', NOW, k(0x77), BigInt(DEADLINE));
 const DERIVED_SALT = pureCircuits.pickSaltOf(1n, ALICE);
 const res = await call(ALICE, 1n, 'sealPick', NOW + 600);
 
-// Everything a chain observer can see for this transaction:
-const trace = res.context.callProofDataTrace;
-const publicTranscript = JSON.stringify(trace, (_, v) =>
-  typeof v === 'bigint' ? v.toString() : (v instanceof Uint8Array ? Buffer.from(v).toString('hex') : v));
+// Everything a chain observer can see for this transaction. On runtime 0.16.0 the
+// public side is proofData.{publicTranscript,input,output}; privateTranscriptOutputs
+// is the witness side and is deliberately EXCLUDED — it legitimately holds the
+// secret, and folding it in here would manufacture a false leak.
+const ser = (v) => JSON.stringify(v, (_, x) =>
+  typeof x === 'bigint' ? x.toString() : (x instanceof Uint8Array ? Buffer.from(x).toString('hex') : x));
+const pd = res.proofData;
+if (!pd || !pd.publicTranscript) {
+  console.error('HARNESS ERROR: proofData.publicTranscript missing — the runtime API moved; re-read compact-runtime/dist/proof-data.d.ts');
+  process.exit(1);
+}
+const publicTranscript = ser({ publicTranscript: pd.publicTranscript, input: pd.input, output: pd.output });
 
 const hex = (b) => Buffer.from(b).toString('hex');
 console.log('public transcript size:', publicTranscript.length, 'chars');
+
+// Positive control. The witness side certainly contains the device secret; if the
+// detector cannot find it THERE, the detector is broken and every "no leak" result
+// below is meaningless. A probe that has only ever been seen to pass proves nothing.
+const privateSide = ser(pd.privateTranscriptOutputs);
+if (!privateSide.includes(Buffer.from(ALICE).toString('hex'))) {
+  console.error('HARNESS ERROR: control failed — the device secret was not found in the PRIVATE transcript, so this probe cannot detect a leak at all.');
+  process.exit(1);
+}
+console.log('control OK — detector finds the secret in the private transcript, so a public leak would be caught');
 console.log('LEAK CHECK — device secret present in public transcript? ',
   publicTranscript.includes(hex(ALICE)) ? 'YES *** LEAK ***' : 'no');
 console.log('LEAK CHECK — derived salt present in public transcript?  ',

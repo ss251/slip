@@ -55,9 +55,7 @@ async function buildWallet(seed) {
     getEncryptionPublicKey: () => zswap.encryptionPublicKey,
     async balanceTx(tx, ttl = ttlOneHour()) {
       const recipe = await wallet.balanceUnboundTransaction(tx, { shieldedSecretKeys: zswap, dustSecretKey: dust }, { ttl });
-      // The SDK wraps this in Effect.tryPromise, so the callback MUST return a
-      // Promise — a synchronous return fails as "Signer callback failed".
-      const signed = await wallet.signRecipe(recipe, (p) => keystore.signDataAsync(p));
+      const signed = await wallet.signRecipe(recipe, (p) => keystore.signData(p));
       return wallet.finalizeRecipe(signed);
     },
     submitTx: (tx) => wallet.submitTransaction(tx),

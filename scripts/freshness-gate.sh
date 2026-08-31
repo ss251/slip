@@ -79,22 +79,29 @@ if [ -f AGENTS.md ] && [ -n "$COMPILER" ]; then
 fi
 
 # --- FAIL 5: the devnet must speak the ledger our compiler targets.
-# Compact 0.34.0 emits ledger-9 code; ledger 9 ships with midnight-node 2.x
-# (spec_version 2_000_000). Against a node 1.x devnet the wallet stack dies as
-# "Failed to decode ledger event payload" and never mentions a version, so check
-# it here instead of losing an afternoon to it. Only runs if a devnet is up.
+# Which ledger that is follows from the runtime the compiler emits, so this stays
+# correct across toolchain moves instead of hardcoding a number:
+#   runtime 0.16.x -> ledger 8 -> midnight-node 1.x (spec_version 1_000_000)
+#   runtime 0.19.x -> ledger 9 -> midnight-node 2.x (spec_version 2_000_000)
+# Get this wrong and the wallet stack dies as "Failed to decode ledger event
+# payload", never mentioning a version. Only runs if a devnet is up.
 if command -v curl >/dev/null 2>&1 && curl -sf -o /dev/null --max-time 2 http://localhost:9944/health 2>/dev/null; then
+  case "$RUNTIME" in
+    0.16.*) WANT_LEDGER=8; WANT_SPEC_MIN=1000000; WANT_SPEC_MAX=1999999 ;;
+    0.19.*) WANT_LEDGER=9; WANT_SPEC_MIN=2000000; WANT_SPEC_MAX=2999999 ;;
+    *)      WANT_LEDGER=""; ;;
+  esac
   SPEC=$(curl -sf --max-time 5 -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":1,"method":"state_getRuntimeVersion","params":[]}' \
     http://localhost:9944 2>/dev/null | grep -oE '"specVersion":[0-9]+' | grep -oE '[0-9]+$')
-  if [ -n "$SPEC" ]; then
-    if [ "$SPEC" -ge 2000000 ] 2>/dev/null; then
-      OK "devnet speaks ledger 9 (spec_version $SPEC) — matches compiler $COMPILER"
-    else
-      FAIL "devnet spec_version $SPEC is the ledger-8 line, but compiler $COMPILER emits ledger-9 code. Start infra/devnet-compose.yml (node 2.x) — a node 1.x devnet fails opaquely as 'Failed to decode ledger event payload'"
-    fi
+  if [ -z "$WANT_LEDGER" ]; then
+    WARN "no known ledger mapping for runtime $RUNTIME — extend the case in freshness-gate.sh"
+  elif [ -z "$SPEC" ]; then
+    WARN "devnet is up but did not report a spec_version — cannot confirm its ledger"
+  elif [ "$SPEC" -ge "$WANT_SPEC_MIN" ] && [ "$SPEC" -le "$WANT_SPEC_MAX" ] 2>/dev/null; then
+    OK "devnet speaks ledger $WANT_LEDGER (spec_version $SPEC) — matches compiler $COMPILER"
   else
-    WARN "devnet is up but did not report a spec_version — cannot confirm it speaks ledger 9"
+    FAIL "devnet spec_version $SPEC does not match ledger $WANT_LEDGER, which compiler $COMPILER (runtime $RUNTIME) targets. Start the matching stack from infra/devnet-compose.yml — a mismatch fails opaquely as 'Failed to decode ledger event payload'"
   fi
 fi
 
@@ -102,7 +109,9 @@ fi
 
 # --- WARN: the world moved. Network checks, never fatal.
 UP=$(compact check 2>/dev/null | grep -oE 'Latest version available: [0-9.]+' | grep -oE '[0-9.]+$')
-[ -n "$UP" ] && [ "$UP" != "$COMPILER" ] && WARN "compiler $COMPILER installed, $UP available — 'compact update' (language may move too; re-verify examples)"
+if [ -n "$UP" ] && [ "$UP" != "$COMPILER" ]; then
+  WARN "compiler $COMPILER installed, $UP available — do NOT upgrade reflexively. We pin to the stack Midnight's networks run; a newer compiler can leave you with no deployable target (that is why we came back from 0.34.0). Move only when the compatibility matrix does."
+fi
 compact self check 2>/dev/null | grep -qi "update available" && WARN "Compact CLI update available — 'compact self update'"
 
 # npm 'latest' is NOT authoritative here — it has shipped behind the version the

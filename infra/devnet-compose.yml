@@ -1,34 +1,74 @@
 # Slip's canonical local devnet — the `undeployed` network the buildathon targets.
 #
-# WHY THESE EXACT TAGS: our contract is compiled by Compact 0.34.0, which emits code
-# for ledger 9 / compact-runtime 0.19.0. Ledger 9 arrives with midnight-node 2.0.0
-# (spec_version 1_000_000 -> 2_000_000). A node 1.x devnet reports protocol
-# V1_0(1000000) and the v5 wallet stack cannot decode its events — it fails as
-# "Failed to decode ledger event payload", never mentioning a version. Verified
-# working: deploy + createSlip succeed against this stack (contracts/scripts/deploy-e2e.mjs).
+# WHY THESE TAGS: we build with Compact 0.31.1 (language 0.23.0, runtime 0.16.0),
+# which targets ledger 8 — what midnight-node 1.x speaks (spec_version 1_000_000)
+# and what every public network runs per the compatibility matrix. Midnight DevRel,
+# 2026-08-31: "0.34.0 is not currently supported by our networks."
 #
-# There is NO ledger 8 -> 9 migration; node 2.x starts a fresh chain by design.
-# Every public network (preview/preprod/mainnet) still runs the ledger-8 stack, so
-# this contract is only deployable locally today. That is fine: the kickoff scopes
-# the buildathon to `undeployed` ("I highly encourage you to stick to undeployed").
+# Do not mix lines. A ledger-9 node (2.x, spec_version 2_000_000) fails against this
+# stack as "Failed to decode ledger event payload", never mentioning a version.
+# scripts/freshness-gate.sh derives the expected ledger from the compiler's runtime
+# version and checks the running node against it.
+#
+# This configuration is taken from midnightntwrk/example-private-party rather than
+# reconstructed: the indexer needs SPO_NODE__URL pointed at the Midnight node and a
+# placeholder BLOCKFROST_ID, or its spo-indexer subsystem dies with "cannot create
+# reconnecting subxt RPC client: Connection refused" AFTER it has already indexed
+# blocks — so it looks healthy first, then disappears.
+#
+# Preview runs node 1.0.1 / indexer 4.3.5; preprod and mainnet 1.0.2 / 4.3.3-hotfix.
 services:
   proof-server:
-    image: 'midnightntwrk/proof-server:9.0.0-rc.4'
+    image: 'midnightntwrk/proof-server:8.1.0'
+    command: ['midnight-proof-server', '-v']
     ports: ['127.0.0.1:6300:6300']
-    environment: { RUST_BACKTRACE: 'full' }
-    command: ['midnight-proof-server', '--verbose']
-  indexer:
-    image: 'midnightntwrk/indexer-standalone:4.4.0-pre-alpha.16-l91r3-n2r3-bridge-and-events-epics-contract-zswap-16c656df'
-    ports: ['127.0.0.1:8088:8088']
     environment:
-      RUST_LOG: 'indexer=info,chain_indexer=info,indexer_api=info,wallet_indexer=info,indexer_common=info,fastrace_opentelemetry=off,info'
-      APP__INFRA__SECRET: '303132333435363738393031323334353637383930313233343536373839303132'
-      APP__INFRA__NODE__URL: 'ws://node:9944'
-      # This indexer build carries the Cardano-bridge epic and requires the key even
-      # though the bridge is inert locally (node 2.0.0 ships it disabled).
-      APP__INFRA__SPO_NODE__BLOCKFROST_ID: 'local-devnet-unused'
+      RUST_BACKTRACE: 'full'
+    healthcheck:
+      test: ['CMD-SHELL', 'echo > /dev/tcp/127.0.0.1/6300']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   node:
-    image: 'midnightntwrk/midnight-node:2.0.0-rc.3'
+    image: 'midnightntwrk/midnight-node:1.0.0'
     ports: ['127.0.0.1:9944:9944']
     environment:
       CFG_PRESET: 'dev'
+      SIDECHAIN_BLOCK_BENEFICIARY: '04bcf7ad3be7a5c790460be82a713af570f22e0f801f6659ab8e84a52be6969e'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9944/health']
+      interval: 2s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  indexer:
+    image: 'midnightntwrk/indexer-standalone:4.3.3'
+    ports: ['127.0.0.1:8088:8088']
+    environment:
+      RUST_LOG: 'indexer=info,chain_indexer=info,indexer_api=info,wallet_indexer=info,indexer_common=info,fastrace_opentelemetry=off,info'
+      APP__INFRA__NODE__URL: 'ws://node:9944'
+      APP__APPLICATION__NETWORK_ID: 'undeployed'
+      APP__INFRA__STORAGE__PASSWORD: 'indexer'
+      APP__INFRA__PUB_SUB__PASSWORD: 'indexer'
+      APP__INFRA__LEDGER_STATE_STORAGE__PASSWORD: 'indexer'
+      APP__INFRA__SECRET: '303132333435363738393031323334353637383930313233343536373839303132'
+      # Points at the Midnight node, not a Cardano SPO: without it the spo-indexer
+      # subsystem exits and takes the whole indexer down.
+      APP__INFRA__SPO_NODE__URL: 'ws://node:9944'
+      APP__INFRA__SPO_NODE__BLOCKFROST_ID: 'local-devnet-unused'
+    healthcheck:
+      test: ['CMD-SHELL', 'cat /var/run/indexer-standalone/running']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    # The node reports healthy before it has produced block 1, and the indexer's
+    # spo-indexer subsystem exits with "Cannot construct OnlineClientAtBlock: block
+    # number 1 not found" if it wins that race. Retry rather than depend on ordering.
+    restart: on-failure
+    depends_on:
+      node:
+        condition: service_healthy

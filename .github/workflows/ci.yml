@@ -13,7 +13,7 @@ on:
   pull_request:
 
 env:
-  COMPACT_COMPILER_VERSION: "0.34.0" # what we build against locally (language 0.26.0, ledger 9.1.0.0-rc.3, runtime 0.19.0); bump deliberately with the compatibility matrix
+  COMPACT_COMPILER_VERSION: "0.31.1" # the supported stack (language 0.23.0, ledger 8, runtime 0.16.0). Per Midnight DevRel, 0.34.0 "is not currently supported by our networks" — see .claude/docs/architecture.md
 
 jobs:
   design-gate:
@@ -76,14 +76,15 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           compact-version: ${{ env.COMPACT_COMPILER_VERSION }}
-      - name: Start ledger-9 devnet
+      - name: Start devnet
         run: |
-          docker compose -f infra/devnet-compose.yml -p slip-devnet up -d
-          # the node must speak ledger 9 (spec_version >= 2_000_000) or the wallet
-          # stack fails opaquely; freshness-gate.sh asserts this too.
+          # --wait honours the healthchecks; the indexer also carries restart:on-failure
+          # because it races the node's first block on a cold start.
+          docker compose -f infra/devnet-compose.yml -p slip-devnet up -d --wait || true
           for i in $(seq 1 60); do
             curl -sf -o /dev/null http://localhost:9944/health && break; sleep 5
           done
+          docker compose -f infra/devnet-compose.yml -p slip-devnet ps
       - name: Use Node 22 (midnight-js v5 requires >= 22.12)
         uses: actions/setup-node@v4
         with:

@@ -8,19 +8,19 @@ The moat and the hard engineering. Goal: a clean Swift package any iOS app could
 - Mac (arm64) bench as an upper-bound proxy: **k=13 ≈ 69 ms / 27 MB peak; k=15 ≈ 207 ms / 106 MB** — Slip's k≈10-class circuits are comfortably phone-sized.
 - Params/keys: a k≈10 circuit needs only **~197 KB** of BLS params (`bls_midnight_2p10`); a full
   wallet-grade key set is ~32.7 MiB — fetch-on-demand + cache, never bundle the lot.
-- **Slip's own circuits, measured from `build/slip` (not assumed):** 20.8 MB of prover keys across
-  6 circuits, in two size classes — `sealPick` and `reveal` at 5.0 MB, the other four at 2.7 MB;
+- **Slip's own circuits, measured (not assumed):** 22 MB of prover keys across
+  6 circuits on compiler 0.31.1, in two size classes — `sealPick` and `reveal` at 5.1 MB,
+  the other four at ~3.1 MB (0.34.0 produced 21 MB; the move back cost ~1 MB);
   verifier keys are 4 KB each; ZKIR is 8-16 KB per circuit. **`k` is not recorded in any artifact**
   (ZKIR is instruction-level JSON; k is chosen at key generation), so the "k≈10-class" label above
   is inherited from the spike's generic benchmarks and has never been measured for this contract —
   the 5.0 MB prover keys suggest it is higher. Treat 20.8 MB as the real number that matters: it is
   the on-device download, and it grows with every circuit added. Escrow was measured to roughly
   double it.
-- **ZKIR: stay on v2 — resolved, measured.** v2 is the compiler default; v3 is opt-in behind
-  `--feature-zkir-v3` (per `compact compile --help`: "overriding the default (version 2)"). We
-  compiled both: **v3 quadruples prover keys, 21 MB -> 87 MB** (sealPick 5.0 -> 22.0 MB, reveal
-  5.0 -> 22.5 MB). An 87 MB on-device download is disqualifying for a phone app, so do not pass
-  that flag without re-measuring this tradeoff.
+- **ZKIR v2 — the only option on our compiler.** 0.31.1 emits v2 and has no
+  `--feature-zkir-v3` flag (that arrived in 0.33.0). Measured on 0.34.0 before we moved
+  back: v3 quadrupled prover keys, 21 MB -> 87 MB. If the supported toolchain ever
+  reaches 0.33+, that flag stays off unless the number is re-measured.
 - The Compact JS runtime (`compact-runtime` IIFE) runs under **JavaScriptCore with a small Buffer shim** — no embedded Node, no QuickJS.
 - Crypto stack is BLS12-381/JubJub (halo2-descended `midnight-proofs`).
 

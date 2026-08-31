@@ -31,14 +31,14 @@ So the honest claim is: *on iOS*, a sealed pick never leaves the device, and tha
 - `settle(round, outcome)` — steward-only; scores computed from verified reveals.
 
 Constraints that shape this design:
-- **Single contract by choice, not by force.** Cross-contract calls *are* supported as of Compact
-  toolchain 0.33.0 (we run 0.34.0); `crossContractCall()` ships in `compact-runtime` 0.19.0, our
-  pinned runtime, and midnight-js v5 assembles/proves/submits call trees. (The docs page
-  `how-midnight-works/building-blocks` still says otherwise — it is stale, as it also is on
-  transaction merging.) We stay single-contract because it is simpler, keeps proving cheap, and
-  avoids the real constraints that come with call trees: an exported circuit reachable by a
-  cross-contract call **cannot call witnesses**, cycles are undefined, and callee artifacts must
-  ship alongside the caller. Revisit only if escrow genuinely needs its own contract.
+- **Single contract.** Cross-contract calls exist in Compact 0.33.0+ but **not on any
+  network we can reach**. Midnight DevRel (Jay Albert), 2026-08-31: *"0.34.0 is not
+  currently supported by our networks. So it's a bit ahead of its time but we are
+  steadily working towards making contract to contract calls available to everyone."*
+  We build on 0.31.1, where the feature does not exist. We were never using it —
+  verified: no `crossContractCall`, no contract types, no contract-typed ledger
+  fields — and would not want to: a circuit reachable by a cross-contract call
+  cannot call witnesses, and ours must.
 - Circuit size stays small (k≈10 class) → proving in ~100ms-class on device and tiny params. Don't add circuit complexity without re-checking `midnightkit.md` budgets.
 - Public ledger state is public: question commitment, seal commitments, reveal results, scores. Sides are hidden **until reveal, then public to the crew and chain** — that's the product contract, don't accidentally promise more.
 
@@ -107,51 +107,38 @@ human-facing faucet page with no programmatic drip, and B needs N funded
 addresses rather than one. That, not latency, is the remaining risk that could
 push us back to a sponsor service.
 
-## Toolchain stack fork (Wave 1 risk)
+## Toolchain: we build on the stack the networks run
 
-Attempting to run the official sponsorship reference (`midnightntwrk/example-private-party`)
-on our stack surfaced a split that affects any JS-side integration.
+We briefly built on Compact 0.34.0 / ledger 9 and came back. The deciding input was
+Midnight DevRel, 2026-08-31: *"0.34.0 is not currently supported by our networks."*
 
-There are two coherent stacks, and we are on the newer one:
+| | stable (ours) | ledger 9 (abandoned) |
+|---|---|---|
+| compiler / language | **0.31.1 / 0.23.0** | 0.34.0 / 0.26.0 |
+| compact-runtime | **0.16.0** | 0.19.0 |
+| midnight-js | **4.1.1** | 5.0.0-beta |
+| node | **1.x** (`spec_version` 1_000_000) | 2.x (2_000_000) |
+| deployable to preview/preprod/mainnet | **yes** | no |
 
-| | compiler | runtime | midnight-js / compact-js | ledger |
-|---|---|---|---|---|
-| stable, mainnet-targeted | 0.31.x | 0.16.0 | midnight-js 4.1.1 / compact-js 2.5.3 | 8 |
-| ours (ledger 9) | **0.34.0** | **0.19.0** | midnight-js 5.0.0-beta / compact-js 2.5.5-rc.8 | **9** |
+Building ahead of the networks cost nothing at compile time and everything at deploy
+time: a 0.34.0 contract has no public network to run on, and the matching DApp SDK is
+a release candidate. `midnight-js` 4.1.1 hard-pins `compact-runtime` 0.16.0, so the
+two stacks cannot be mixed — that pin is the mechanism, not an accident.
 
-`@midnight-ntwrk/compact-js` **hard-pins** `compact-runtime` to an exact version
-(2.5.3 -> 0.16.0), and `midnight-js-protocol` does the same. So the current
-*stable* DApp SDK cannot execute contracts compiled by our compiler: it fails with
-`Version mismatch: compiled code expects 0.19.0, runtime is 0.16.0`, and pinning
-the top-level runtime does not fix it because the nested copies win. The only
-compact-js that targets runtime 0.19.0 is **2.5.5-rc.8, a release candidate**.
-This matches the 0.34.0 release note: *"If you are building contracts to be
-deployed to the current Mainnet, continue to use Compact toolchain 0.31.x."*
+**What the move back cost:** a one-line pragma change (0.26 -> 0.23; the contract used
+no 0.26-only features), a test-harness port (`createCircuitContext` has a different
+signature and `currentQueryContext` sits directly on the context rather than under
+`callContext`), and the e2e workspace moving to the 4.1.1 line. Prover keys grew
+21 MB -> 22 MB. All 84 assertions still pass, and deploy+call still works.
 
-**Why this does not block us today:** our contract and simulator tests use
-`compact-runtime` 0.19.0 directly, and MidnightKit proves in Rust and talks to
-node/indexer itself rather than through midnight-js. The exposure is any JS-side
-tooling we add later.
+**What it bought:** a contract that can actually be deployed to preview/preprod when
+we want to, rather than only to a local release-candidate node.
 
-**Decide before building JS tooling:** adopt the pre-release line (RC/beta), or
-drop to the 0.31.x stable stack and give up ledger-9 features. Do not assume the
-stable SDK works with our artifacts — it does not.
-
-### State of the sponsorship reference (our fallback)
-
-Three layers of drift, so "A has a working reference implementation" is weaker
-than it sounds:
-
-1. Its contract is not in the repo at all — the README is a tutorial you type in
-   (`cd contract && touch private-party.compact`).
-2. That contract declares `pragma language_version 0.23;` and is rejected by our
-   compiler. A bump to `>= 0.26` is sufficient — 5 circuits compile clean — so
-   the drift here is only the version declaration, not the language usage.
-3. Its test suite then fails on the runtime/stack mismatch above, before any
-   sponsorship assertion runs.
-
-None of this says sponsorship is broken; it says the reference is pinned to the
-older stack. If we ever fall back to A, budget time for porting it.
+Judge our own earlier reasoning honestly: staying on 0.34.0 was defensible while the
+only evidence was that the kickoff scopes the buildathon to `undeployed` — but
+"nothing forces us off it" is a weaker argument than "the vendor says the networks do
+not support it", and we should have weighted the compatibility matrix more heavily
+than the absence of a hard blocker.
 
 ## Stakes and offramping
 
@@ -292,16 +279,16 @@ Bring it up with `npm run devnet:up` (contracts/) — `infra/devnet-compose.yml`
 `http://localhost:6300`. The proof server is for tooling/CLI parity only; the app path
 must never depend on it.
 
-**The node version is load-bearing.** Our contract is ledger 9 (Compact 0.34.0), which
-means midnight-node **2.x** — node 1.x is the ledger-8 line and the wallet stack fails
-against it as "Failed to decode ledger event payload" with no mention of a version.
-`freshness-gate.sh` now checks the running devnet's `spec_version` (>= 2_000_000).
+**The node version is load-bearing.** Our contract is ledger 8 (Compact 0.31.1), so the
+devnet must be midnight-node **1.x**. Mixing lines fails as "Failed to decode ledger
+event payload" with no mention of a version, so `freshness-gate.sh` derives the
+expected ledger from the compiler's runtime version and checks the running node
+against it (0.16.x -> ledger 8, 0.19.x -> ledger 9).
 
 **Proven on-chain** (`npm run test:network`, 2026-08-31): deployed at
-`80fb9cf2…bae1ef74` in 21.8s, `createSlip` returned `SucceedEntirely` in 17.3s, ledger
+`f081477a…3fed04f` in 21.8s, `createSlip` returned `SucceedEntirely` in 17.3s, ledger
 advanced `status 0 -> 1` with `sealDeadline` written. A real proof was generated and
 verified by the network, so the contract is no longer compiler-and-simulator only.
 
-Public networks (preview/preprod/mainnet) all still run the ledger-8 stack (Compact
-0.31.1 / runtime 0.16.0 / midnight-js 4.1.1), so this contract is not deployable there
-without a port. Deliberate, not an oversight — see the toolchain stack fork above.
+Because we build on the supported stack, the same artifacts target preview/preprod
+when we want a publicly verifiable deployment.
