@@ -57,7 +57,8 @@ offer to each member's already-bound transaction (`balanceFinalizedTransaction`
 with `tokenKindsToBalance: ['dust']`). Members hold nothing and one sponsor
 address serves unlimited members, because the sponsor spends its *own* DUST
 rather than delegating any. It is the documented pattern with a reference
-implementation. Rejected because it is a server: hosting, uptime during judging,
+implementation — though see the caveat below: that reference does not currently
+run on our toolchain. Rejected because it is a server: hosting, uptime during judging,
 and a party who can decline to relay — a bad shape for an app whose claim is that
 no one can interfere with a sealed pick. Its real ceiling is capacity, not
 addressing: DUST refills toward ~5 per NIGHT over roughly a week, so a busy
@@ -105,6 +106,52 @@ fund, ~17s to register); parallelisable, and one-time at crew setup.
 human-facing faucet page with no programmatic drip, and B needs N funded
 addresses rather than one. That, not latency, is the remaining risk that could
 push us back to a sponsor service.
+
+## Toolchain stack fork (Wave 1 risk)
+
+Attempting to run the official sponsorship reference (`midnightntwrk/example-private-party`)
+on our stack surfaced a split that affects any JS-side integration.
+
+There are two coherent stacks, and we are on the newer one:
+
+| | compiler | runtime | midnight-js / compact-js | ledger |
+|---|---|---|---|---|
+| stable, mainnet-targeted | 0.31.x | 0.16.0 | midnight-js 4.1.1 / compact-js 2.5.3 | 8 |
+| ours (ledger 9) | **0.34.0** | **0.19.0** | midnight-js 5.0.0-beta / compact-js 2.5.5-rc.8 | **9** |
+
+`@midnight-ntwrk/compact-js` **hard-pins** `compact-runtime` to an exact version
+(2.5.3 -> 0.16.0), and `midnight-js-protocol` does the same. So the current
+*stable* DApp SDK cannot execute contracts compiled by our compiler: it fails with
+`Version mismatch: compiled code expects 0.19.0, runtime is 0.16.0`, and pinning
+the top-level runtime does not fix it because the nested copies win. The only
+compact-js that targets runtime 0.19.0 is **2.5.5-rc.8, a release candidate**.
+This matches the 0.34.0 release note: *"If you are building contracts to be
+deployed to the current Mainnet, continue to use Compact toolchain 0.31.x."*
+
+**Why this does not block us today:** our contract and simulator tests use
+`compact-runtime` 0.19.0 directly, and MidnightKit proves in Rust and talks to
+node/indexer itself rather than through midnight-js. The exposure is any JS-side
+tooling we add later.
+
+**Decide before building JS tooling:** adopt the pre-release line (RC/beta), or
+drop to the 0.31.x stable stack and give up ledger-9 features. Do not assume the
+stable SDK works with our artifacts — it does not.
+
+### State of the sponsorship reference (our fallback)
+
+Three layers of drift, so "A has a working reference implementation" is weaker
+than it sounds:
+
+1. Its contract is not in the repo at all — the README is a tutorial you type in
+   (`cd contract && touch private-party.compact`).
+2. That contract declares `pragma language_version 0.23;` and is rejected by our
+   compiler. A bump to `>= 0.26` is sufficient — 5 circuits compile clean — so
+   the drift here is only the version declaration, not the language usage.
+3. Its test suite then fails on the runtime/stack mismatch above, before any
+   sponsorship assertion runs.
+
+None of this says sponsorship is broken; it says the reference is pinned to the
+older stack. If we ever fall back to A, budget time for porting it.
 
 ## Stakes and offramping
 
