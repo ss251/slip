@@ -215,6 +215,8 @@ if (opt.is_some) { const val = opt.value; }
 // Either (used for wallet-or-contract addresses)
 const wallet = left<ZswapCoinPublicKey, ContractAddress>(ownPublicKey());
 const contract = right<ZswapCoinPublicKey, ContractAddress>(kernel.self());
+// NB the OpenZeppelin Compact library no longer uses this shape for party identity —
+// it moved to account ids, Either<Bytes<32>, ContractAddress>. See below.
 
 // Hashing
 persistentHash<Vector<2, Bytes<32>>>([data1, data2]);    // SHA-256
@@ -286,10 +288,16 @@ Authoritative matrix: <https://docs.midnight.network/relnotes/support-matrix>
 | `@midnight-ntwrk/compact-runtime` | **0.16.0** |
 | Midnight.js (`midnight-js-*`) | **4.1.1** |
 | DApp Connector API | 4.0.1 |
-| Node | 1.0.1 |
+| Node | **1.0.2** (mainnet + preprod) · 1.0.1 (preview) |
 | Ledger | 8.1.0 |
-| Indexer | 4.3.3 |
+| Indexer | 4.3.3-hotfix (mainnet + preprod) · 4.3.5 (preview) |
 | Proof Server | 8.1.0 |
+
+⚠ **Node version now differs per network** — preview trails mainnet/preprod rather than
+leading it. Verified 2026-08-30 by asking each network directly:
+`curl -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"system_version","params":[]}' https://rpc.mainnet.midnight.network`
+returns `1.0.2-eb71e64e`; preview returns `1.0.1-5edf8ddd`. The live endpoint is the
+authority, not the release page — see the artifact-availability warning below.
 
 ⚠ **Keep every `@midnight-ntwrk/midnight-js-*` package on the same major line.** Mixing 3.x
 and 4.x produces `Cannot read properties of undefined (reading 'ctor')` — an error that looks
@@ -297,7 +305,96 @@ like a contract problem and is not. **Ledger v7 is no longer supported.**
 
 The simulator API used throughout this skill (`createConstructorContext`,
 `createCircuitContext`, `sampleContractAddress`) was **verified present in compact-runtime
-0.16.0** on 2026-08-17.
+0.16.0**, re-confirmed 2026-08-30 by running 10 contract suites (69 tests) against it.
+
+### ⚠ Never `npm install @midnight-ntwrk/compact-runtime@latest`
+
+**npm's `latest` tag is AHEAD of every released compiler.** As of 2026-08-30 npm serves
+`compact-runtime@0.19.0`, but the current compiler (`compactc` 0.31.1) emits code targeting
+**0.16.0**. Install `latest` and every contract fails the moment it loads:
+
+```
+CompactError: Version mismatch: compiled code expects 0.16.0, runtime is 0.19.0
+```
+
+**The compiler decides the runtime version, not npm.** Pin `compact-runtime` to the version in
+the compatibility matrix for your compiler and let nothing bump it — a caret range is fine
+within a 0.x minor, but `@latest` or a blind `npm update` will break the whole project.
+
+Measured 2026-08-30 across all 10 example contracts, which is how this was found:
+
+| configuration | result |
+|---|---|
+| compiled 0.14.0 + runtime 0.14.0 (as-was) | 10/10 pass |
+| compiled 0.14.0 + runtime **0.19.0** (`@latest`) | **10/10 fail** — expects 0.14.0, runtime is 0.19.0 |
+| recompiled 0.31.1 + runtime **0.19.0** | **10/10 fail** — expects 0.16.0, runtime is 0.19.0 |
+| recompiled 0.31.1 + runtime **0.16.0** | **10/10 pass** ✓ |
+
+⚠ **Changing the runtime version means RECOMPILING.** The version is baked into the generated
+`src/managed/<name>/contract/index.js` at compile time. Bumping the npm package alone always
+fails — you must re-run `compactc` and keep the runtime pin matched to it.
+
+The failure is at least a *good* one: the runtime version-gates on load and names both
+versions, so a mismatch is loud and immediate rather than silently wrong.
+
+**Verified compatible pairing (2026-08-30):**
+
+```json
+"@midnight-ntwrk/compact-runtime":      "^0.16.0",
+"@midnight-ntwrk/midnight-js-network-id": "^4.1.1"
+```
+
+with `compactc` 0.31.1. The `midnight-js` 3.x → 4.x major bump caused no breakage in any of
+the 10 suites. Contracts written six months ago compiled unchanged on 0.31.1 — no Compact
+language regressions in that window.
+
+## ⚠ OpenZeppelin Compact: identity moved from coin public keys to account IDs
+
+If you have contracts written against `OpenZeppelin/compact-contracts` before ~mid-2026, they
+will not compile against the current library. The identity model changed:
+
+| | before | now |
+|---|---|---|
+| party identity | `Either<ZswapCoinPublicKey, ContractAddress>` | **`Either<Bytes<32>, ContractAddress>`** |
+| the `Bytes<32>` is | — | `persistentHash(secretKey)` — an **account id** |
+| authentication | implicit from `ownPublicKey()` | caller **proves knowledge of the secret key** via a witness |
+
+`ZswapCoinPublicKey` no longer appears in `FungibleToken` at all (verified 2026-08-30). Both
+`Ownable` and `FungibleToken` now identify parties by account id, and each declares its own
+witness:
+
+```
+witness wit_OwnableSK(): Bytes<32>;        // Ownable.compact
+witness wit_FungibleTokenSK(): Bytes<32>;  // FungibleToken.compact
+```
+
+`Ownable.assertOnlyOwner()` compares `persistentHash(wit_OwnableSK())` against the stored owner,
+so authorisation is a zero-knowledge proof of key possession rather than an address comparison.
+
+**Three things that will catch you migrating:**
+
+1. **Every call site is a compile error, not a silent bug.** The compiler names both the supplied
+   and declared types. That is the good case — fix them mechanically.
+2. **Supply EVERY module's witness.** Composing modules means composing witnesses. Missing one
+   does not fail at load; it fails at *every circuit call*, which looks like broken test logic
+   rather than missing wiring. Both factories read `privateState.secretKey`, so one secret key
+   serves both:
+   ```ts
+   const witnesses = { ...OwnableWitnesses(), ...FungibleTokenWitnesses() };
+   // and pass the key in private state:
+   createConstructorContext({ secretKey: OWNER_SK }, coinKeyEither.left)
+   ```
+3. **Build the account id the same way the contract does**, or `assertOnlyOwner` will reject a
+   caller that looks correct:
+   ```ts
+   const buildAccountIdHash = (sk: Uint8Array) =>
+     persistentHash(new CompactTypeVector(1, new CompactTypeBytes(32)), [sk]);
+   const ownerEither = { is_left: true, left: buildAccountIdHash(sk), right: { bytes: zeroBytes } };
+   ```
+
+A complete worked example composing FungibleToken + Ownable + Pausable — contract and passing
+test suite — is in [`examples/composition/`](examples/composition/). Verified 2026-08-30 against
+compiler 0.31.1 / `compact-runtime` 0.16.0 / `ledger-v8` 8.1.0.
 
 ## Testing
 
@@ -371,11 +468,55 @@ Measured from 13 contract deployments on preprod (March 2026):
 funded the wallet *before* designating, send tNight to yourself to create a new UTXO that will
 generate DUST. Getting this order wrong leaves the send option greyed out with no explanation.
 
+## ⚠ You cannot download the version the network is running (verified 2026-08-30)
+
+Node **1.0.2** runs on mainnet and preprod, but there is **no public 1.0.2 artifact**. Every
+documented channel disagrees, and each one looks authoritative on its own:
+
+| source | says |
+|---|---|
+| Live RPC `system_version` | **1.0.2**-eb71e64e (mainnet, preprod) |
+| Docs compatibility matrix | 1.0.2 (mainnet, preprod) |
+| GitHub **releases** | latest stable is **1.0.1**; 1.0.2 exists only as `alpha.1/2/3` |
+| Docker Hub `midnightnetwork/midnight-node` | stops at **0.12.1** (June 2025) |
+| Docs "set up a full node" guide | install **0.22.5** (April 2026) |
+| `midnight-node-docker` presets | `qanet`, `testnet-02` — **both retired networks** |
+
+**Practical consequences:**
+
+- **Do not build on `midnight-node-docker` for a current network.** Its only presets target
+  networks that no longer exist, and it has had no functional commit since March 2026. The
+  compose scaffold cannot reach preview/preprod/mainnet without being rewritten.
+- **The full-node guide installs a version four generations behind the network.** Following it
+  literally gives you 0.22.5 against a 1.0.2 chain.
+- **The newest tag is not the newest network.** `node-2.1.0-beta.1` (21 Aug 2026) is *ahead* of
+  what any network runs. Newest-tag-wins picks a beta that matches nothing.
+- **If you need to run a node**, take the latest stable release (`node-1.0.1`) and verify it
+  against the target chain, or ask in the service desk for the 1.0.2 artifact. Do not assume the
+  version in the announcement is downloadable.
+
+**Rule: read the version off the chain (`system_version`), never off a release page.** For
+anything that only *talks to* a node — DApps, indexers, monitoring — use the public RPC
+endpoints below and skip local node operation entirely.
+
 ## Networks (verified 2026-08-17)
 
-**Mainnet is live** — Node 1.0.0 from 20 Jul 2026, 1.0.1 from 29 Jul. It runs in **federated**
-mode: block production is operated by the foundation, and third-party validation has not opened.
-An Incentivised Testnet is expected to precede it.
+**Mainnet is live** — Node 1.0.0 from 20 Jul 2026, 1.0.1 from 29 Jul, **1.0.2 from 22 Aug**.
+It runs in **federated** mode: block production is operated by the foundation, and third-party
+validation has not opened. An Incentivised Testnet is expected to precede it.
+
+**Measured 2026-08-30, not inferred.** `sidechain_getAriadneParameters` across Cardano epochs
+640-653 returns, on both mainnet and preprod, **13 permissioned candidates and 0 registered
+(SPO) candidates** every epoch, with `dParameter = {numPermissionedCandidates: 0,
+numRegisteredCandidates: 0}`. So third-party validator registration is not merely
+undocumented — there is nothing registered on chain. Anyone planning to run a Midnight
+validator should treat that as the current state of the world.
+
+```bash
+curl -s -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"sidechain_getAriadneParameters","params":[652]}' \
+  https://rpc.mainnet.midnight.network
+```
 
 | | endpoint |
 |---|---|

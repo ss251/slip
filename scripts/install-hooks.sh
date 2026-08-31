@@ -6,8 +6,9 @@ HOOK=".git/hooks/pre-push"
 [ -d .git ] || { echo "run from the repo root of a git checkout"; exit 1; }
 cat > "$HOOK" <<'EOF'
 #!/bin/sh
-# Slip pre-push gate: design/privacy gate + contract compile (when present).
+# Slip pre-push gate: freshness + design/privacy + contract compile (when present).
 set -e
+sh scripts/freshness-gate.sh
 sh scripts/design-gate.sh Slip
 if [ -f contracts/slip.compact ]; then
   if command -v compact >/dev/null 2>&1; then

@@ -41,6 +41,9 @@ jobs:
       - name: Verify Compact installation
         if: steps.has.outputs.contract == 'true'
         run: compact compile --version
+      - name: Freshness gate (toolchain/pin/pragma consistency)
+        if: steps.has.outputs.contract == 'true'
+        run: sh scripts/freshness-gate.sh
       - name: Compile contract
         if: steps.has.outputs.contract == 'true'
         run: compact compile contracts/slip.compact build/slip

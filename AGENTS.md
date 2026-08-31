@@ -19,7 +19,7 @@ Built on [Midnight](https://docs.midnight.network) (a privacy blockchain whose C
 contracts/        slip.compact + compiled artifacts (TS types, zkir, keys)
 MidnightKit/      Swift package: prover FFI, key/params management, wallet (later)
 Slip/             SwiftUI app
-scripts/          design-gate.sh, install-hooks.sh (run once: wires pre-push gates)
+scripts/          design-gate.sh, freshness-gate.sh, install-hooks.sh (run once: wires pre-push gates)
 docs/design/      the eight target screens as PNGs — UI work matches these, pixel-close
 docs/how-slip-works.html  interactive end-to-end explainer (self-contained)
 .claude/docs/     deep references — read the relevant one before working in that area
@@ -28,7 +28,7 @@ docs/how-slip-works.html  interactive end-to-end explainer (self-contained)
 
 ## Setup
 
-1. Compact toolchain: install the `compact` CLI, then `compact self update && compact update`. Verified stack as of 2026-08-31: **CLI 0.5.2 · compiler 0.34.0 · language 0.26.0 · ledger 9.1.0.0-rc.3 · runtime 0.19.0**. The toolchain moves fast and breaks — re-run `compact check` / `compact self check` before a build session, and treat any pre-0.26 language example (including vendored ones) as suspect until it compiles.
+1. Compact toolchain: install the `compact` CLI, then `compact self update && compact update`. Verified stack as of 2026-08-31: **CLI 0.5.2 · compiler 0.34.0 · language 0.26.0 · ledger 9.1.0.0-rc.3 · runtime 0.19.0**. The toolchain moves fast and breaks. **`scripts/freshness-gate.sh` enforces this** (pre-push + CI): it fails on drift we control — a `compact-runtime` pin that isn't what our compiler emits, a CI pin that isn't the local compiler, a pragma above the installed language, docs advertising a stack we no longer run — and warns when the compiler, CLI, or a vendored skill has moved upstream. Rule it encodes: **the compiler decides the runtime version, not npm** (`compact compile -- --runtime-version`).
 2. Local network + proof server: Docker-based `midnight-local-dev` (see `.claude/docs/resources.md`).
 3. Xcode 26 / Swift 6 toolchain; Rust with `aarch64-apple-ios` and `aarch64-apple-ios-sim` targets for MidnightKit work.
 4. AI assistance: install the official **Midnight Expert** plugins (`claude plugin marketplace add https://midnightntwrk.expert`) — they verify generated Compact against the real compiler. This repo also ships a knowledge skill at `.claude/skills/midnight-compact/` (vendored from adavault/midnight-skill, MIT): 30 compiler-validated example contracts — including commit-reveal and prediction-market shapes — plus a long gotchas reference. Use the skill for patterns, the plugin for verification. The docs index for LLMs is `https://docs.midnight.network/llms.txt`.
@@ -37,7 +37,8 @@ docs/how-slip-works.html  interactive end-to-end explainer (self-contained)
 
 Canonical shapes (compile syntax confirmed against official Midnight CI and the vendored skill; CI pins the toolchain via `midnightntwrk/setup-compact-action`, version in `.github/workflows/ci.yml`):
 
-- Compile contract: `compact compile contracts/slip.compact build/slip` (sanity: `compact compile --version`)
+- Freshness/drift check: `sh scripts/freshness-gate.sh` (add `--no-network` for a fast local-only run)
+- Compile contract: `compact compile contracts/slip.compact build/slip` (sanity: `compact compile --version`; add `--skip-zk` while iterating)
 - Contract tests: simulator-based TS tests (see `.claude/docs/testing.md`)
 - App build/tests: `xcodebuild -scheme Slip test` (snapshot tests need a booted iOS 26 simulator)
 - Design gate (run on any UI diff): `scripts/design-gate.sh Slip/`

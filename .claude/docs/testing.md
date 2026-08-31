@@ -16,6 +16,10 @@ Evidence over assertion. Every feature lands with its tests; every summary quote
 4. **End-to-end (local net)** — against `undeployed`: two simulated devices complete a full round (create → both seal → deadline → reveal → settle). This is the demo-critical path; keep it green.
 5. **Design gate** — `scripts/design-gate.sh Slip/` on any UI diff (see `design.md`).
 
+## Dependency pinning
+
+Before installing the simulator harness, run `compact compile -- --runtime-version` and pin `@midnight-ntwrk/compact-runtime` to exactly that. Never `@latest`. A mismatch fails at contract load with `CompactError: Version mismatch`, and `scripts/freshness-gate.sh` fails the push before you get there.
+
 ## Loop
 
 Daily work runs entirely on the local trio (node 9944 / indexer 8088 / proof server 6300 for tooling). Deploying to a public test network is a milestone event with its own checklist in `roadmap.md`, not part of the inner loop.
