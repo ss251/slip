@@ -90,12 +90,21 @@ Three implementation traps, each found by hitting it:
    its `signDustRegistration` callback; a following `signRecipe` produces
    `Malformed(InputsSignaturesLengthMismatch)`.
 
-**Not yet proven:** the N-member case end to end. Address-scoping is read from the
-ledger spec and corroborated by the cNIGHT proposal ("at most one registration per
-wallet address"), not demonstrated with several members. Also untested on
-`preview`/`preprod`, where funding comes from a human-facing faucet page rather
-than a genesis wallet — that, not latency, is the risk that could push us back to
-a sponsor service.
+**Proven at crew scale** (`scripts/measure-n-members.ts`, local devnet): one
+steward funded 3 sub-addresses, each designating a different member. All three
+members — each starting with zero NIGHT and zero DUST — had spendable DUST at
+**54.2s**, and the steward's own generation was untouched.
+
+The finding that matters: **3/3 registrations were self-funded from retroactive
+DUST.** Each sub-address held `DUST = 0` at registration and still paid its own
+fee, so the bootstrap problem does not exist in practice — *the steward needs
+NIGHT and never needs DUST*. Budget roughly 35s per member, sequential (~18s to
+fund, ~17s to register); parallelisable, and one-time at crew setup.
+
+**Still untested on `preview`/`preprod`,** where funding comes from a
+human-facing faucet page with no programmatic drip, and B needs N funded
+addresses rather than one. That, not latency, is the remaining risk that could
+push us back to a sponsor service.
 
 ## Stakes and offramping
 

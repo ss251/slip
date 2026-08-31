@@ -16,9 +16,11 @@ The moat and the hard engineering. Goal: a clean Swift package any iOS app could
   the 5.0 MB prover keys suggest it is higher. Treat 20.8 MB as the real number that matters: it is
   the on-device download, and it grows with every circuit added. Escrow was measured to roughly
   double it.
-- Open: our compile emits **ZKIR v2** (`"version": {"major": 2, "minor": 0}`) while toolchain 0.33.0
-  added ZKIR v3 support. Unclear whether v2 is the intended default for 0.34.0 — check before
-  assuming the on-device prover must handle v3.
+- **ZKIR: stay on v2 — resolved, measured.** v2 is the compiler default; v3 is opt-in behind
+  `--feature-zkir-v3` (per `compact compile --help`: "overriding the default (version 2)"). We
+  compiled both: **v3 quadruples prover keys, 21 MB -> 87 MB** (sealPick 5.0 -> 22.0 MB, reveal
+  5.0 -> 22.5 MB). An 87 MB on-device download is disqualifying for a phone app, so do not pass
+  that flag without re-measuring this tradeoff.
 - The Compact JS runtime (`compact-runtime` IIFE) runs under **JavaScriptCore with a small Buffer shim** — no embedded Node, no QuickJS.
 - Crypto stack is BLS12-381/JubJub (halo2-descended `midnight-proofs`).
 
