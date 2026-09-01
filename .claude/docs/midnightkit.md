@@ -6,8 +6,18 @@ The moat and the hard engineering. Goal: a clean Swift package any iOS app could
 
 - `midnight-zk` / `midnight-zkir` cross-compile to `aarch64-apple-ios` and `aarch64-apple-ios-sim` **with zero upstream patches**; real PLONK+KZG prove+verify ran in the iOS Simulator (~115 ms at k=5).
 - Mac (arm64) bench as an upper-bound proxy: **k=13 ≈ 69 ms / 27 MB peak; k=15 ≈ 207 ms / 106 MB** — Slip's k≈10-class circuits are comfortably phone-sized.
-- Params/keys: a k≈10 circuit needs only **~197 KB** of BLS params (`bls_midnight_2p10`); a full
-  wallet-grade key set is ~32.7 MiB — fetch-on-demand + cache, never bundle the lot.
+- **`sealPick` is k=14 — measured, and the old k≈10 guess was wrong by 15x on params.**
+  A k=14 circuit needs `bls_midnight_2p14` = **3.0 MB** of BLS params, not the ~197 KB a
+  k=10 circuit needs. Params double per k (k10 197 KB, k13 1.5 MB, k14 3.0 MB, k15 6.0 MB)
+  and are fetched from `https://srs.midnight.network/bls_midnight_2p{k}`.
+- **Measured on host (M-series, release build) proving Slip's REAL sealPick circuit** with a
+  real preimage exported from the simulator: **keygen 953 ms, prove 779 ms, proof 4480 bytes**.
+  This is the first end-to-end proof of an actual Compact circuit here — everything before it
+  was a 3-multiplication toy at k=5.
+- **The device risk is memory, not time.** The spike's Mac numbers bracket us: k=13 = 69 ms /
+  27 MB peak, k=15 = 207 ms / 106 MB peak. At k=14 expect peak RSS in the tens of MB, and iOS
+  kills apps for memory (Jetsam) long before users complain about a second of latency. Watch
+  peak RSS at least as closely as wall time on device.
 - **Slip's own circuits, measured (not assumed):** 22 MB of prover keys across
   6 circuits on compiler 0.31.1, in two size classes — `sealPick` and `reveal` at 5.1 MB,
   the other four at ~3.1 MB (0.34.0 produced 21 MB; the move back cost ~1 MB);
