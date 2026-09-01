@@ -14,6 +14,32 @@ The moat and the hard engineering. Goal: a clean Swift package any iOS app could
   real preimage exported from the simulator: **keygen 953 ms, prove 779 ms, proof 4480 bytes**.
   This is the first end-to-end proof of an actual Compact circuit here — everything before it
   was a 3-multiplication toy at k=5.
+- **PROVEN ON iOS (simulator, iPhone 17 Pro, 2026-09-01).** Slip's real `sealPick`
+  circuit, real proving keys, real witness data, inside the iOS runtime:
+  **keygen 1050 ms, prove 968 ms, proof 4480 bytes, wall 2.02 s.** Only ~24% slower
+  than host (779 ms), so the runtime itself costs little. The product's central
+  claim — the proof is generated on the phone — is now demonstrated, not asserted.
+- **Memory is the open risk: RSS 219 MB -> 448 MB across the prove.** That 229 MB
+  delta is far above what the k=13/k=15 bracket suggested. Harmless on a simulator
+  with the Mac's RAM; on a real iPhone, sustained 448 MB in a foreground app is
+  Jetsam territory, especially mid-range hardware. Measure peak RSS *continuously*
+  on device (sample during the MSM), not before/after — the peak is what Jetsam reacts to.
+- **Load artifacts from the app bundle, never a host path.** `open()` on a host
+  `/Volumes/...` path from inside the simulator sandbox **blocks forever**: 0% CPU,
+  no crash, no timeout, all samples parked in `open`. It looks exactly like a
+  pathologically slow prover and is not one. This cost hours; `sample <pid>` on the
+  test host found it in seconds because simulator processes are native macOS
+  processes. Fixtures now ship as test-bundle resources.
+- **One Rust staticlib only.** Two libs that each pull `midnight-curves` both embed
+  blst and collide on duplicate symbols when force-loaded. MidnightKit must expose
+  prove/verify/keys from a single crate.
+- **Toolchain trap:** Homebrew's rustc has no iOS targets; rustup's stable was too
+  old for the ledger tree. Symptom is `can't find crate for core`, which blames the
+  wrong thing. Pin via `rust-toolchain.toml` and keep rustup current.
+- **Not a suspect: blst assembly.** Its `build.rs` selects asm on `CARGO_CFG_TARGET_ARCH`
+  alone, so `aarch64-apple-ios-sim` gets the same assembly as `aarch64-apple-darwin`;
+  there is no simulator special case. The portable-C fallback is ~2-5x, not orders of
+  magnitude. Also `server.o` in the archive is blst's own amalgamated C, not aws-lc.
 - **The device risk is memory, not time.** The spike's Mac numbers bracket us: k=13 = 69 ms /
   27 MB peak, k=15 = 207 ms / 106 MB peak. At k=14 expect peak RSS in the tens of MB, and iOS
   kills apps for memory (Jetsam) long before users complain about a second of latency. Watch
