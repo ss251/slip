@@ -30,3 +30,7 @@ contracts/test/slipcontract
 # midskills: sources are vendored in .agents/skills/ (tracked); .claude/skills/ are
 # symlinks the installer creates for Claude Code discovery — do not track those.
 .claude/skills/
+
+# python bytecode from scripts/paper-gate.py
+__pycache__/
+*.pyc
