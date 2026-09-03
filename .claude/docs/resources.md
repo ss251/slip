@@ -16,7 +16,15 @@ Both live in `.mcp.json` at the repo root, so cloning the repo is the install. T
 1. **The session must have been launched from inside this repo.** `.mcp.json` is *project-scoped*. A session started in `~` never loads it — `claude mcp list` run from `~` shows no entries at all, while the same command run from the repo shows them connected. `cd`-ing mid-session does not fix it.
 2. **Servers bind at session start.** Adding or changing one mid-session requires a restart.
 
-So the fix for "kapa isn't there" is almost always `cd ~/Developer/slip && claude`, not re-auth. Diagnose with `claude mcp list` **run from the repo directory** — it reports true connection state (`✔ Connected` / `⏸ Pending approval`) independently of what the running session bound. Spawning a subagent is *not* a confirmed workaround for a wrong launch directory — one attempt with a wrongly-launched parent came back reporting the server unavailable, though that run was also genuinely unapproved at the time, so the two causes were not separable. Relaunch rather than relying on it.
+So the fix for "kapa isn't there" is almost always `cd ~/Developer/slip && claude`, not re-auth. Diagnose with `claude mcp list` **run from the repo directory** — it reports true connection state (`✔ Connected` / `⏸ Pending approval`) independently of what the running session bound. **Subagents inherit the parent session's MCP binding — confirmed 2026-09-03.** A probe
+agent spawned from a session launched outside the repo reported the same servers
+missing, and the same `ConnectionRefused` for a plugin server whose app was started
+*after* session launch. So a subagent is NOT a workaround for a wrong launch
+directory or a server that was down at start: only relaunching helps. Note the
+`paper-desktop` **plugin skills** (`code-to-design`, `design-to-code`) remain
+available even when the Paper MCP server is unreachable — skills and MCP tools ship
+in the same plugin but bind differently, which makes it easy to think Paper is
+connected when it is not.
 
 | server | what it answers | notes |
 |---|---|---|
