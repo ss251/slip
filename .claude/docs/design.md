@@ -46,7 +46,30 @@ Press = scale 0.97 on pointer-down, 150 ms strong ease-out, no haptic. Seal land
 
 ## Visual reference
 
-The eight target screens live at `docs/design/00-how-slip-works.png` … `07-standings.png` (exported from the maintained design file). UI work reproduces these — when code and PNG disagree, the PNG wins until the design file itself changes. The interactive flow explainer is `docs/how-slip-works.html`.
+**Canonical: `docs/design/v5/` — twelve boards** (`00-how-slip-works` … `07-standings`,
+including `01b-home-first-run`, `02b-invite`, `03b-sealing`, `06a-opening`,
+`06b-verdict`). Source: the Paper page "v5 — the sealed pick". UI work reproduces
+these — when code and PNG disagree, the PNG wins until the design file itself
+changes. The interactive flow explainer is `docs/how-slip-works.html`.
+
+`docs/design/*.png` (v4, eight boards) is **superseded** — kept only for diffing.
+Do not build against it.
+
+**Verify a board before trusting it.** The v4 set sat in git for a week fully
+transparent, seven of the eight byte-identical, because a failed export was
+committed and never re-opened. Binary assets have no reviewable diff. Open the PNG.
+
+The three ideas the boards encode, so code doesn't quietly drop them:
+
+1. **One object.** The pick card is a single thing in four states — chosen,
+   sealing under the disc, the ticket, flipped open. "Sealed" is never a word, a
+   colour, and an icon meaning three different things.
+2. **Asymmetry is the proof.** You can see your own pick; nobody else's. Hold-to-peek
+   on your own card, sealed discs for everyone else. This is why no padlock icon
+   appears anywhere in the app — the behaviour states the privacy model.
+3. **Open ≠ Verdict.** Picks open at the deadline (sides in ink, no green, no
+   winner); the steward records the outcome later (green, points, provenance).
+   These are separate screens because they are separate moments.
 
 ## Enforcement
 
