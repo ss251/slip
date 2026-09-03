@@ -29,7 +29,23 @@ connected when it is not.
 | server | what it answers | notes |
 |---|---|---|
 | `midnight` (kapa) | "what does Midnight *say* about X" — docs-grounded, indexes the docs, ledger/midnight.js/node repos, and the whitepaper | HTTP, `https://midnight.mcp.kapa.ai`. Requires an **OAuth step the docs page omits**: run `/mcp`, pick `midnight`, approve. Until then it shows `Needs authentication`. |
-| `octocode-mcp` | "what does the code actually *do*" — GitHub source search; the `midnight-verify` agents use it | stdio via `npx`; no auth |
+| `octocode-mcp` | "what does the code actually *do*" — GitHub source search; the `midnight-verify` agents use it | stdio, **installed binary** (`npm install -g octocode-mcp`); no auth |
+
+**octocode must be an installed binary, not `npx`.** Measured: `npx octocode-mcp`
+takes ~14s to re-resolve the package on every launch, which plus server boot exceeds
+the 30s MCP handshake and surfaces as `connection timed out` — a startup-cost
+failure that reads like a broken server. The installed binary starts in ~5.5s.
+`.mcp.json` uses the bare command name rather than an absolute path on purpose: node
+lives under nvm here, so a pinned path would break at the next node upgrade.
+Reinstall with `npm install -g octocode-mcp` if it ever reports timed out again.
+
+Both servers are verified by *using* them, not by reading `✔ Connected` — a
+handshake proves a process started, not that it answers. From the repo:
+
+```
+claude -p "<question>" --allowedTools "mcp__midnight__search_midnight_knowledge_sources"
+claude -p "<question>" --allowedTools "mcp__octocode-mcp__ghGetFileContent"
+```
 
 Reach for kapa when docs suffice, octocode when docs and behaviour might disagree — that split is how the block-time enforcement claim got settled at ledger source rather than taken on faith. The raw `llms.txt` markdown route stays useful when you want the page itself, not an answer.
 

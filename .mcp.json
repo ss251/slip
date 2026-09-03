@@ -6,10 +6,8 @@
     },
     "octocode-mcp": {
       "type": "stdio",
-      "command": "npx",
-      "args": [
-        "octocode-mcp"
-      ],
+      "command": "octocode-mcp",
+      "args": [],
       "env": {}
     }
   }
