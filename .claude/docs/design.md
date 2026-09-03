@@ -73,4 +73,9 @@ The three ideas the boards encode, so code doesn't quietly drop them:
 
 ## Enforcement
 
-`scripts/design-gate.sh <src-dir>` runs the mechanical subset (token discipline, raw font sizes, glass-outside-chrome, missing Reduce Motion guards, sub-44pt tappables, easeIn). Run it on every UI diff; fix causes at the token/system level — exemptions are design debt. Contrast targets: 4.5:1 (<18pt), 3:1 large — verify against the *effective* background, translucent chips get solid backing when text sits on art.
+Two gates, different targets. **`scripts/paper-gate.py`** checks the *design boards*
+against the live Paper file (palette, type scale, HIG body length, contrast, tap
+targets, one-wax-moment, board hygiene) — run it after any board change; it needs
+Paper running and reaches it over `127.0.0.1:29979` directly, so it works even when
+the Paper MCP plugin is not connected. **`scripts/design-gate.sh <src-dir>`** runs
+the mechanical subset (token discipline, raw font sizes, glass-outside-chrome, missing Reduce Motion guards, sub-44pt tappables, easeIn). Run it on every UI diff; fix causes at the token/system level — exemptions are design debt. Contrast targets: 4.5:1 (<18pt), 3:1 large — verify against the *effective* background, translucent chips get solid backing when text sits on art.
