@@ -14,6 +14,34 @@ The moat and the hard engineering. Goal: a clean Swift package any iOS app could
   real preimage exported from the simulator: **keygen 953 ms, prove 779 ms, proof 4480 bytes**.
   This is the first end-to-end proof of an actual Compact circuit here — everything before it
   was a 3-multiplication toy at k=5.
+- **PROVEN ON A PHYSICAL iPhone 15 Pro (A17 Pro), 2026-09-03**, loading the
+  compiler-emitted proving key: **pk load 24 ms, prove 1776 ms, wall 1.81 s,
+  proof 4480 bytes, peak RSS 290 MB.**
+- **Never run keygen at runtime.** `compactc` already emits `keys/<circuit>.prover`;
+  regenerating it cost **1173 ms on every prove** for nothing. Loading it is a 24 ms
+  file read — a 49x reduction on that step and −32% wall (2.66 s -> 1.81 s). The file
+  is tagged (`midnight:prover-key[v7](...)`) so it needs `tagged_deserialize`, and
+  deserialization is lazy: the gzipped `MidnightPK` inflates on first use inside the
+  prove window (which is why `prove` rises 1479 -> 1776 ms while the total falls).
+- **Loading the key does NOT reduce peak memory** — measured 289 MB -> 290 MB. The
+  serialized 5 MB key is not the in-memory key: `ProvingKey::read` recomputes the
+  cosets, so you get the same ~40-50 MB PK either way, and the peak lives in the
+  PROVE phase where PK cosets, advice cosets, permutation products and the quotient
+  buffer coexist. Keygen transients are freed before that peak. Do not re-litigate this.
+- **Memory does not currently need fixing.** Foreground Jetsam is ~2.0-2.2 GB even on
+  4 GB devices, so 290 MB transient has ~2.5x headroom; ~100-150 MB is the realistic
+  floor for k=14 with this library, so we are ~2x par, not 5x. The one lever that
+  would halve it — dropping to k=13 — is **blocked**: it would require moving hashes
+  to `transientHash`/`transientCommit`, which the API reference says are "not
+  guaranteed to persist between upgrades" and "should not be used to derive state
+  data". Every hash in `slip.compact` derives state (memberId, stewardAuth, the seal
+  commitment, and the pick salt that must re-derive at reveal). A transient salt would
+  make every unrevealed seal permanently unopenable after a protocol upgrade.
+- **The real risk is latency on older silicon, not memory.** A13/A14 devices
+  (iPhone SE 2/3, 11, 12) were ~6-9 s with runtime keygen; the key fix should put them
+  near 3-4 s. Measure on the oldest supported device before promising a seal time.
+- **App extensions are out of reach** (~120 MB cap vs our 290 MB peak). "Seal from the
+  share sheet" is not possible without a fundamentally smaller circuit.
 - **PROVEN ON iOS (simulator, iPhone 17 Pro, 2026-09-01).** Slip's real `sealPick`
   circuit, real proving keys, real witness data, inside the iOS runtime:
   **keygen 1050 ms, prove 968 ms, proof 4480 bytes, wall 2.02 s.** Only ~24% slower
