@@ -130,10 +130,11 @@ if [ -f contracts/package.json ]; then
 fi
 
 # vendored skills: compare by COMMIT against upstream, never by a version file
-for s in .claude/skills/*/SOURCE.md; do
+for s in .claude/skills/*/SOURCE.md .agents/skills/SOURCE.md; do
   [ -f "$s" ] || continue
   REPO=$(grep -oE 'https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+' "$s" | head -1)
-  PIN=$(grep -oE 'commit \*\*?[0-9a-f]{7,40}' "$s" | grep -oE '[0-9a-f]{7,40}' | head -1)
+  # tolerate "commit abc123", "commit: `abc123`", "**Pinned at commit:** `abc123`"
+  PIN=$(grep -iE 'commit' "$s" | grep -oE '[0-9a-f]{7,40}' | head -1)
   [ -z "$REPO" ] || [ -z "$PIN" ] && continue
   HEAD_SHA=$(git ls-remote "$REPO" HEAD 2>/dev/null | cut -f1)
   [ -z "$HEAD_SHA" ] && continue
