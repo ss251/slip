@@ -42,7 +42,29 @@ Large 34/41·700 — Title2 22/28·700 — Title3 20/25 — Headline 17/22·600 
 
 ## Motion & haptics
 
-Press = scale 0.97 on pointer-down, 150 ms strong ease-out, no haptic. Seal lands = stamp scale 1.15→1.0 `spring(0.4, bounce 0.25)` + heavy impact (bounce earned by the gesture). Reveal flip = per-row 3D flip, 60 ms stagger capped at 5, `spring(0.5, 0)`, `.success` haptic on your row; **Reduce Motion → crossfade**. Sheets `spring(0.45, bounce 0.2)` only after drag-release (button-open = bounce 0), always interruptible. Lists/tabs/keyboard actions never animate. Never `easeIn`.
+Press = scale 0.97 on pointer-down, 150 ms strong ease-out, no haptic.
+
+**Hold to seal** = 1.2 s linear with visible progress (the seal disc fills); release
+before completion cancels in ~200 ms ease-out with no haptic and no state change.
+Linear, not eased — a hold is a *timer*, and easing makes remaining time unreadable.
+**Never shorten it under Reduce Motion**: it is a safety-timed confirmation, not
+decoration. It is the one gesture the product is named after; treat its timing as a
+product decision, not a tuning knob.
+
+Seal lands = stamp scale 1.15→1.0 `spring(0.4, bounce 0.2)` + heavy impact (bounce
+earned by the gesture's momentum, and 0.2 is the ceiling — above that it reads as a
+toy). Reveal flip = per-row 3D flip, 60 ms stagger capped at 5, `spring(0.5, 0)`, `.success` haptic on your row; **Reduce Motion → crossfade**. Sheets `spring(0.45, bounce 0.2)` only after drag-release (button-open = bounce 0), always interruptible. Lists/tabs/keyboard actions never animate. Never `easeIn`.
+
+**Accessibility states live in the app, not the pixels.** Reduce Motion → crossfade
+(never a blanket `animation: none`, and never shorten the hold). Reduce Transparency
+→ solid fill. **Increase Contrast → add borders** to cards, chips and the tab bar.
+Dynamic Type scales layout, not just glyphs.
+
+**Shadows get their own token** (`--shadow`), never a reuse of `bg` or a literal —
+a shadow whose hex happens to equal today's background is white shadows in dark mode
+waiting to happen. Cards carry elevation, so the token exists even though the house
+style forbids *poster* shadows. `paper-gate.py` does not inspect shadows; that makes
+the token discipline load-bearing rather than optional.
 
 ## Visual reference
 
