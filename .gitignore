@@ -38,3 +38,6 @@ __pycache__/
 # MidnightKit: the Rust archive is ~60MB and rebuilds from source (scripts/sync-prover.sh)
 MidnightKit/Vendor/*.a
 MidnightKit/.build/
+
+# living handoff documents for agent-to-agent continuation (enforced by hooks)
+handoff/

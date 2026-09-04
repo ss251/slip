@@ -11,5 +11,17 @@
       "Bash(sh scripts/design-gate.sh:*)",
       "Bash(sh scripts/install-hooks.sh)"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh scripts/handoff-gate.sh stop"
+          }
+        ]
+      }
+    ]
   }
 }

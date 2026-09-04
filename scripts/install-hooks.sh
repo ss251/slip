@@ -22,3 +22,11 @@ fi
 EOF
 chmod +x "$HOOK"
 echo "installed $HOOK"
+
+# Commit boundaries must refresh the living handoff (see scripts/handoff-gate.sh).
+cat > .git/hooks/pre-commit <<'EOF2'
+#!/bin/sh
+sh scripts/handoff-gate.sh pre-commit
+EOF2
+chmod +x .git/hooks/pre-commit
+echo "installed .git/hooks/pre-commit (handoff gate)"
