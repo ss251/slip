@@ -138,3 +138,49 @@ by machinery.
 the iOS platform floor (`isolation()` needs macOS 10.15+, and the package declares
 iOS only) and cannot link an `aarch64-apple-ios` archive. Always xcodebuild against
 a simulator destination.
+
+
+## Contract execution on device — JavaScriptCore, VERIFIED 2026-09-04
+
+An earlier version of these notes claimed the Compact runtime "loads under JSC with a
+small Buffer shim." That was never executed; LANE-C.md said `UNVERIFIED` and no
+`JSContext` code existed. It is now verified by a test (`IosHost/IosHostTests/
+JSCRuntimeTests.swift`, spike dir):
+
+- `compact-runtime-iife.js` (Kuira's extracted bundle, 71.8 KB) loads under
+  `JSContext` on the iPhone 17 Pro simulator in **54 ms**, exposing `__compactRuntime`
+  with **114 exports**, calling **zero** natives at load time.
+- Calling `__compactRuntime.persistentHash(new CompactTypeBytes(32), bytes)` routes
+  into a host-registered native and the reply comes back parsed — full round trip.
+
+**Why there is no WASM problem:** the bundle contains zero `WebAssembly` references.
+Kuira's shim replaced the WASM on-chain runtime with **eight host callbacks**; that
+is the entire native surface MidnightKit must provide:
+
+```
+__native_contractQuery        __native_persistentHash_aligned
+__native_persistentCommit     __native_transientHash
+__native_bigIntToValue        __native_valueToBigInt
+__native_stateCreateWithNulls __native_stateSetOperation
+```
+
+**Naming trap:** the ESM shim file says `__native_persistentHash`; the IIFE that
+actually runs says `__native_persistentHash_aligned`. Grep the IIFE for
+`globalThis.__native_`, never the shim, for the real names.
+
+**Wire contract:** everything crosses the bridge as **JSON text**. `persistentHash`
+takes one string `{value:[[bytes]…], alignment}` and returns a string that is either
+an array of byte arrays or `{error}`. Natives are plain functions on `globalThis`.
+
+**Buffer:** JSC has none. The runtime uses only `Buffer.from(hex,'hex')`,
+`Buffer.from(bytes)` and `.toString('hex')` — a ~15-line polyfill, mandatory.
+
+**Still open (Day 1, deliverable 2 → Day 4 gate):** `__native_contractQuery` backed by
+the ledger's `QueryContext` in Rust; then executing `sealPick` end-to-end in JSC and
+proving the resulting preimage is **byte-identical** to one built in Node. Only that
+diff makes on-device execution a fact rather than a demo.
+
+Also: skip `proofDataIntoSerializedPreimage` (a raw WASM re-export with no JS body).
+JS returns `proofData`; the preimage is built natively via `construct_proof`
+(`ledger/src/construct.rs:502`), keeping preimage assembly and the `binding_input`
+overwrite in one Rust process — which is also what Kuira does.
