@@ -8,10 +8,3 @@
 - **Contract changes:** recompile before claiming done; paste the compiler result. Simulator tests accompany every circuit change.
 - Machine-local pointers (research corpus, local search index, private notes) live in `CLAUDE.local.md` — gitignored, may be absent on other machines; never move its contents into tracked files.
 
-## Bootstrap checklist (delete this section once the scaffold exists)
-
-1. `compact update`, then `compact compile --version` (the compile syntax is already pinned in AGENTS.md §Commands, confirmed against official Midnight CI).
-2. Start local net (`midnight-local-dev`), confirm node/indexer/proof-server ports respond.
-3. Scaffold `contracts/slip.compact` (commit–reveal skeleton per `.claude/docs/architecture.md`) until it compiles clean — this is day-one done.
-4. `swift package init` MidnightKit + Rust staticlib target per `.claude/docs/midnightkit.md`.
-5. Xcode app target `Slip/` with the token set from `.claude/docs/design.md` as `DesignTokens.swift`.

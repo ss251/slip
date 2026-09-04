@@ -1,0 +1,84 @@
+name: Slip
+
+options:
+  minimumXcodeGenVersion: 2.45.0
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  MidnightKit:
+    path: MidnightKit
+
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+    TARGETED_DEVICE_FAMILY: 1
+    DEVELOPMENT_TEAM: L594CGSH6A
+    CODE_SIGN_STYLE: Automatic
+    LIBRARY_SEARCH_PATHS: ["$(inherited)", "$(SRCROOT)/MidnightKit/Vendor"]
+
+targets:
+  Slip:
+    type: application
+    platform: iOS
+    sources:
+      - path: Slip
+    dependencies:
+      - package: MidnightKit
+    preBuildScripts:
+      - name: Bundle local seal proving artifacts
+        script: |
+          set -eu
+          DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ProofArtifacts"
+          mkdir -p "$DEST/zkir" "$DEST/keys" "$DEST/params"
+          cp "${SRCROOT}/contracts/build/zkir/sealPick.zkir" "$DEST/zkir/"
+          cp "${SRCROOT}/contracts/build/keys/sealPick.prover" "$DEST/keys/"
+          cp "${SRCROOT}/contracts/build/params/bls_midnight_2p14" "$DEST/params/"
+        inputFiles:
+          - $(SRCROOT)/contracts/build/zkir/sealPick.zkir
+          - $(SRCROOT)/contracts/build/keys/sealPick.prover
+          - $(SRCROOT)/contracts/build/params/bls_midnight_2p14
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/sealPick.zkir
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/sealPick.prover
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/params/bls_midnight_2p14
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sailesh.slip
+        PRODUCT_NAME: Slip
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Slip
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.social-networking
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIAppFonts: [JetBrainsMono-Regular.ttf]
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        ENABLE_PREVIEWS: YES
+
+  SlipTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SlipTests
+    dependencies:
+      - target: Slip
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sailesh.slip.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Slip:
+    build:
+      targets:
+        Slip: all
+        SlipTests: [test]
+    test:
+      gatherCoverageData: true
+      environmentVariables:
+        SLIP_RECORD_SNAPSHOTS: $(SLIP_RECORD_SNAPSHOTS)
+      targets:
+        - SlipTests
