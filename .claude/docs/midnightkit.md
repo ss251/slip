@@ -197,3 +197,14 @@ block time passed to the VM as a 3rd query arg; child contexts inherit block/cal
 `StateValue.toJSON` canonical form; the transcript recorder stores the canonical
 (Rust-serde) op shape the VM consumed. Next: build the proof preimage natively from
 `proofData` (`ledger/src/construct.rs` `construct_proof`) and feed `slip_prove_circuit`.
+
+## Execute → preimage → prove, all on device — PASSED 2026-09-05
+
+`slip-prove-ffi/src/preimage.rs` ports the runtime's `proofDataIntoSerializedPreimage`
+line for line (`slip_proof_data_into_preimage(json, key_location, out_path)` in the C
+ABI). Host test: native bytes equal Node's `contracts/build/sealPick.preimage.bin`
+(387 bytes). `JSCExecutionTests` now continues past byte-identity: the device's own
+`proofData` → native preimage (identical to Node's) → `slip_prove_circuit` → rc 0,
+pk load 27 ms, prove 1229 ms, proof 4480 bytes (iPhone 17 Pro simulator). The witness
+never leaves the process. Remaining for MidnightKit: host JSC + the 8 natives + this
+call behind `Prover`, and ship the two libraries (sim/device) via `scripts/sync-prover.sh`.
