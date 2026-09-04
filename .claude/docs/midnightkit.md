@@ -184,3 +184,16 @@ Also: skip `proofDataIntoSerializedPreimage` (a raw WASM re-export with no JS bo
 JS returns `proofData`; the preimage is built natively via `construct_proof`
 (`ledger/src/construct.rs:502`), keeping preimage assembly and the `binding_input`
 overwrite in one Rust process — which is also what Kuira does.
+
+## On-device execution gate — PASSED 2026-09-04
+
+`IosHostTests/JSCExecutionTests` (spike, external SSD) runs `enrollMember → createSlip →
+sealPick` under JavaScriptCore through the 8 `__native_*` hooks into the real Rust ledger
+VM (`slip-prove-ffi/src/{contract_query,crypto_natives}.rs`) and requires the resulting
+`proofData` to be byte-identical to Node's golden (`contracts/build/sealPick-proofdata.json`).
+Result: `IDENTICAL: true`, 3612 bytes both sides, 29/29 public-transcript ops, executed in
+38 ms. Four LOCAL PATCHES to Kuira's runtime shim were needed (all marked `LOCAL PATCH`):
+block time passed to the VM as a 3rd query arg; child contexts inherit block/callContext;
+`StateValue.toJSON` canonical form; the transcript recorder stores the canonical
+(Rust-serde) op shape the VM consumed. Next: build the proof preimage natively from
+`proofData` (`ledger/src/construct.rs` `construct_proof`) and feed `slip_prove_circuit`.
