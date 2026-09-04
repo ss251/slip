@@ -104,3 +104,37 @@ The moat and the hard engineering. Goal: a clean Swift package any iOS app could
 ## Non-goals (v1)
 
 No embedded wallet UI, no token transfers, no Android. Keep the package headless and small; the app owns UX.
+
+
+## CI coverage — MidnightKit is NOT covered, and this is a real gap
+
+The Rust prover's source lives **outside this repo** (external volume, with the rest
+of the spike), and the built archive is gitignored (~61 MB per architecture). A CI
+runner can reach neither, so `MidnightKit/Vendor/*.a` is absent there and the lane
+**emits a GitHub warning and skips** rather than pretending to pass.
+
+That skip is deliberate and loud. A silently-green lane that tests nothing is the
+failure mode this repo has already hit four times (blank design PNGs, a board gate
+crashing on valid input, a privacy probe whose detector could never fire, a
+freshness regex that silently matched nothing). If MidnightKit's lane ever reports
+success, it must be because it ran.
+
+What this means in practice: **MidnightKit is verified locally, not by CI.** Before
+any release, run it yourself and paste the output:
+
+```
+sh scripts/sync-prover.sh aarch64-apple-ios-sim
+cd MidnightKit && xcodebuild test -scheme MidnightKit \
+  -destination 'platform=iOS Simulator,name=<a device that exists>'
+```
+
+To close the gap properly, the prover source has to become reachable by CI — either
+vendored into this repo (the source is one `lib.rs` plus a `Cargo.toml`; only the
+`target/` output is large) or published as a prebuilt xcframework release that CI
+downloads. Until one of those happens, treat MidnightKit's green marks as unverified
+by machinery.
+
+`swift test` will never work here: it builds for the macOS host, which both misses
+the iOS platform floor (`isolation()` needs macOS 10.15+, and the package declares
+iOS only) and cannot link an `aarch64-apple-ios` archive. Always xcodebuild against
+a simulator destination.

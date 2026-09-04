@@ -56,13 +56,35 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Swift/Xcode tests (skips until targets exist)
+      - name: Pick an available iOS simulator
+        id: sim
         run: |
-          if [ ! -d Slip.xcodeproj ] && [ ! -d Slip.xcworkspace ] && [ ! -f MidnightKit/Package.swift ]; then
-            echo "no Swift targets yet — skipping (pre-scaffold)"; exit 0; fi
-          if [ -f MidnightKit/Package.swift ]; then swift test --package-path MidnightKit; fi
-          if [ -d Slip.xcodeproj ] || [ -d Slip.xcworkspace ]; then
-            xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 16' test; fi
+          # Never hardcode a device name: runners rotate them, and a missing name
+          # fails as "Unable to find a device matching the destination specifier",
+          # which reads like a project error rather than a naming one.
+          NAME=$(xcrun simctl list devices available | grep -oE 'iPhone [0-9]+[^(]*' | head -1 | sed 's/ *$//')
+          echo "name=${NAME:-iPhone 16}" >> "$GITHUB_OUTPUT"
+          echo "using simulator: ${NAME:-iPhone 16}"
+
+      - name: MidnightKit (iOS)
+        run: |
+          if [ ! -f MidnightKit/Package.swift ]; then echo "no MidnightKit yet — skipping"; exit 0; fi
+          # MidnightKit is an iOS-only package that links a Rust staticlib. `swift test`
+          # builds for the macOS HOST, which both misses the iOS platform floor and
+          # cannot link an aarch64-apple-ios archive — it must be xcodebuild against a
+          # simulator destination.
+          if ! ls MidnightKit/Vendor/*.a >/dev/null 2>&1; then
+            echo "::warning title=MidnightKit untested::Rust prover archive absent (MidnightKit/Vendor/*.a is gitignored and its source lives outside this repo), so MidnightKit is NOT covered by CI. See .claude/docs/midnightkit.md §CI coverage."
+            exit 0
+          fi
+          cd MidnightKit && xcodebuild test -scheme MidnightKit \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
+
+      - name: App tests (skips until the app target exists)
+        run: |
+          if [ ! -d Slip.xcodeproj ] && [ ! -d Slip.xcworkspace ]; then
+            echo "no app target yet — skipping (pre-scaffold)"; exit 0; fi
+          xcodebuild -scheme Slip -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" test
 
   # per skill §13: local-network e2e runs on main only, not every PR
   network-e2e:
