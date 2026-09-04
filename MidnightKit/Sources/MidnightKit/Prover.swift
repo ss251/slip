@@ -22,6 +22,47 @@ public actor Prover {
         public let bytes: Int
         public let keyLoadDuration: Duration
         public let proveDuration: Duration
+        /// The proof itself — what travels. Empty for the file-preimage path, which
+        /// exists only for benchmarking against Node-built preimages.
+        public let data: Data
+    }
+
+    /// Proves `circuit` from the `proofData` JSON the contract runtime produced.
+    ///
+    /// This is the product path: execution happened in `ContractRuntime` on this
+    /// device, and the preimage — which carries the private transcript, i.e. data
+    /// derived from the witness — is built in memory by the Rust side and never
+    /// written anywhere. The returned `Proof.data` is the only thing that leaves.
+    public func prove(circuit: String, proofData: String) async throws -> Proof {
+        try artifacts.validate(circuit: circuit)
+        let irPath = artifacts.circuit(circuit).path
+        let keyPath = artifacts.provingKey(circuit).path
+        let paramsPath = artifacts.parametersDirectory.path
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let thread = Thread {
+                var keygenMs: UInt64 = 0, proveMs: UInt64 = 0, len = 0
+                var ptr: UnsafeMutablePointer<UInt8>? = nil
+                let rc = irPath.withCString { ir in paramsPath.withCString { params in
+                    proofData.withCString { pd in circuit.withCString { key in keyPath.withCString { pk in
+                        slip_prove_proof_data(ir, params, pd, key, pk, &keygenMs, &proveMs, &ptr, &len)
+                    } } } } }
+                guard rc == 0, let ptr else {
+                    continuation.resume(throwing: MidnightKitError.from(code: rc, circuit: circuit)); return
+                }
+                let data = Data(bytes: ptr, count: len)
+                slip_free_bytes(ptr, len)
+                continuation.resume(returning: Proof(
+                    bytes: len,
+                    keyLoadDuration: .milliseconds(Int(keygenMs)),
+                    proveDuration: .milliseconds(Int(proveMs)),
+                    data: data
+                ))
+            }
+            thread.stackSize = 64 * 1024 * 1024
+            thread.qualityOfService = .userInitiated
+            thread.start()
+        }
     }
 
     /// Proves `circuit` against a preimage produced by executing the contract.
@@ -59,7 +100,8 @@ public actor Prover {
                     continuation.resume(returning: Proof(
                         bytes: Int(proofBytes),
                         keyLoadDuration: .milliseconds(Int(keygenMs)),
-                        proveDuration: .milliseconds(Int(proveMs))
+                        proveDuration: .milliseconds(Int(proveMs)),
+                        data: Data()
                     ))
                 } else {
                     continuation.resume(throwing: MidnightKitError.from(code: rc, circuit: circuit))

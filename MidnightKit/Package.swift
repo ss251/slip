@@ -32,12 +32,17 @@ let package = Package(
             name: "MidnightKit",
             dependencies: ["CSlipProve"],
             path: "Sources/MidnightKit",
+            // The Compact JS runtime (Kuira's extracted shim, with our LOCAL PATCHES) and
+            // the compiled contract bundle, executed under JavaScriptCore on device. (Not named
+            // "Resources": codesign rejects a bundle with a top-level directory of that name.)
+            resources: [.copy("JS")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "MidnightKitTests",
             dependencies: ["MidnightKit"],
-            path: "Tests/MidnightKitTests"
+            path: "Tests/MidnightKitTests",
+            resources: [.copy("Fixtures")]
         )
     ]
 )

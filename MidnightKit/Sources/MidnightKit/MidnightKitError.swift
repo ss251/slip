@@ -10,6 +10,10 @@ public enum MidnightKitError: Error, Equatable, Sendable {
     case preimageInvalid
     case proveFailed(code: Int32)
     case cancelled
+    /// The contract runtime (JavaScriptCore) threw; message is the JS error.
+    case runtime(String)
+    /// `proofData` from the runtime did not deserialise into a proof preimage.
+    case proofDataInvalid
 
     /// Maps the FFI's negative return codes. Anything unrecognised stays `proveFailed`
     /// with its raw code rather than being flattened into a generic error — a code we
@@ -22,6 +26,7 @@ public enum MidnightKitError: Error, Equatable, Sendable {
         case -14: return .preimageInvalid
         case -16: return .provingKeyMissing(circuit: circuit)
         case -17: return .provingKeyUnreadable(circuit: circuit)
+        case -18: return .proofDataInvalid
         default:  return .proveFailed(code: code)
         }
     }
@@ -38,6 +43,8 @@ extension MidnightKitError: CustomStringConvertible {
         case .preimageInvalid:             "proof preimage could not be decoded"
         case .proveFailed(let code):       "proving failed (code \(code))"
         case .cancelled:                   "proving was cancelled"
+        case .runtime(let m):              "contract runtime error: \(m)"
+        case .proofDataInvalid:            "proofData from the runtime could not be decoded into a preimage"
         }
     }
 }

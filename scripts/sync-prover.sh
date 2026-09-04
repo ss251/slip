@@ -12,7 +12,7 @@
 set -eu
 FFI="${SLIP_PROVER_SRC:-$HOME/Developer/midnight-ios-spike/slip-prove-ffi}"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/MidnightKit/Vendor"
-TARGET="${1:-aarch64-apple-ios}"   # or aarch64-apple-ios-sim
+TARGET="${1:-aarch64-apple-ios-sim}"   # tests + CI link the simulator slice; pass aarch64-apple-ios for a device build
 
 [ -d "$FFI" ] || { echo "prover source not found at $FFI (set SLIP_PROVER_SRC)"; exit 1; }
 mkdir -p "$DEST"

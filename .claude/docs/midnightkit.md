@@ -208,3 +208,23 @@ ABI). Host test: native bytes equal Node's `contracts/build/sealPick.preimage.bi
 pk load 27 ms, prove 1229 ms, proof 4480 bytes (iPhone 17 Pro simulator). The witness
 never leaves the process. Remaining for MidnightKit: host JSC + the 8 natives + this
 call behind `Prover`, and ship the two libraries (sim/device) via `scripts/sync-prover.sh`.
+
+## Execution lives in MidnightKit now (2026-09-05)
+
+`Sources/MidnightKit/Runtime/ContractRuntime.swift` hosts JavaScriptCore, loads the
+runtime from the package's `JS/` resources (`buffer-polyfill.js`, `polyfills.js`,
+`compact-runtime-iife.js` — Kuira's shim WITH our four `LOCAL PATCH`es, now tracked here
+as the source of truth — and the compiled `slip-contract-iife.js` from
+`contracts/build`), and installs the eight `__native_*` hooks over the Rust FFI.
+`Prover.prove(circuit:proofData:)` calls `slip_prove_proof_data`: the preimage is built
+in memory on the Rust side and never written to disk; the proof bytes come back in
+`Proof.data`. Gate: `Tests/MidnightKitTests/ContractRuntimeTests.swift` — sealPick
+executed on device must equal Node's golden `proofData` (fixture) and must prove
+(4480 bytes). Measured on the iPhone 17 Pro simulator: execute 28 ms, prove 1.41 s.
+
+Run: `cd MidnightKit && sh ../scripts/sync-prover.sh && xcodebuild test -scheme MidnightKit
+-destination 'platform=iOS Simulator,name=<iPhone from simctl list>'`. The test reads
+proving artifacts from `contracts/build/{zkir,keys,params}` (gitignored; `compact compile`
+produces zkir+keys, `params/bls_midnight_2p14` is the k=14 SRS the proof server
+downloads — copy it there once). The resource directory is `JS/`, not `Resources/`:
+codesign rejects a SwiftPM bundle with a top-level directory of that name.
