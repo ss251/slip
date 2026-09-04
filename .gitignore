@@ -34,3 +34,7 @@ contracts/test/slipcontract
 # python bytecode from scripts/paper-gate.py
 __pycache__/
 *.pyc
+
+# MidnightKit: the Rust archive is ~60MB and rebuilds from source (scripts/sync-prover.sh)
+MidnightKit/Vendor/*.a
+MidnightKit/.build/

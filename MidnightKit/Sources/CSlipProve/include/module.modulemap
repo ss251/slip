@@ -1,0 +1,4 @@
+module CSlipProve {
+    header "slip_prove_ffi.h"
+    export *
+}
