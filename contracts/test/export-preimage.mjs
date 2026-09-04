@@ -7,7 +7,10 @@ import { Contract, pureCircuits } from './slipcontract/index.js';
 import { writeFileSync } from 'node:fs';
 setNetworkId('undeployed');
 
-const ADDR = rt.sampleContractAddress(), CPK = { bytes: new Uint8Array(32) };
+// Deterministic on purpose: the on-device execution gate diffs JSC's proofData against
+// this file's, so nothing random may enter either run.
+const FIXED_ADDR = '11'.repeat(32);
+const ADDR = FIXED_ADDR, CPK = { bytes: new Uint8Array(32) };
 const k = (b) => new Uint8Array(32).fill(b);
 const STEWARD = k(1), ALICE = k(2);
 const NOW = 1788000000, DEADLINE = NOW + 3600;
@@ -43,6 +46,15 @@ const bytes = rt.proofDataIntoSerializedPreimage(
   pd.input, pd.output, pd.publicTranscript, pd.privateTranscriptOutputs, 'sealPick',
 );
 writeFileSync('build/sealPick.preimage.bin', Buffer.from(bytes));
+// Golden proofData for the on-device execution gate: JSC must reproduce this
+// byte-for-byte (after the same canonical serialisation) or execution is unfaithful.
+const enc = (v) => JSON.parse(JSON.stringify(v, (_, x) =>
+  typeof x === 'bigint' ? x.toString() : (x instanceof Uint8Array ? Array.from(x) : x)));
+writeFileSync('build/sealPick-proofdata.json', JSON.stringify({
+  input: enc(pd.input), output: enc(pd.output),
+  publicTranscript: enc(pd.publicTranscript), privateTranscriptOutputs: enc(pd.privateTranscriptOutputs),
+}));
+console.log('wrote build/sealPick-proofdata.json');
 console.log('wrote build/sealPick.preimage.bin', bytes.length, 'bytes');
 console.log('  public transcript ops :', pd.publicTranscript.length);
 console.log('  private outputs       :', pd.privateTranscriptOutputs.length);
