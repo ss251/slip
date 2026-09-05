@@ -7,43 +7,6 @@ enum OpeningMode: Equatable, Sendable {
     case mismatch
 }
 
-struct RevealVisualState: Equatable, Sendable {
-    let opacity: Double
-    let rotationDegrees: Double
-}
-
-enum RevealMotionPlan {
-    static let maximumStaggeredRows = 5
-    static let noBounce: Double = 0
-    static let hiddenOpacity: Double = 0
-    static let restingAngle: Double = 0
-    static let hiddenAngle: Double = -90
-    static let axisX: CGFloat = 1
-    static let axisY: CGFloat = 0
-    static let axisZ: CGFloat = 0
-    static let perspective: CGFloat = 0.72
-
-    static func delay(forRowAt index: Int) -> TimeInterval {
-        let nonnegativeIndex = max(index, 0)
-        let cappedIndex = min(nonnegativeIndex, maximumStaggeredRows - 1)
-        return TimeInterval(cappedIndex) * SlipMotion.revealStagger
-    }
-
-    static func visualState(isRevealed: Bool, reduceMotion: Bool) -> RevealVisualState {
-        RevealVisualState(
-            opacity: isRevealed ? SlipOpacity.opaque : hiddenOpacity,
-            rotationDegrees: isRevealed || reduceMotion ? restingAngle : hiddenAngle
-        )
-    }
-
-    static func completedRows(
-        afterCancelling revealedRows: Set<Int>,
-        participatingIndices: [Int]
-    ) -> Set<Int> {
-        revealedRows.union(participatingIndices)
-    }
-}
-
 struct SealedRoomScreen: View {
     @Environment(AppModel.self) private var model
     @Environment(SealFlowModel.self) private var flow
@@ -188,8 +151,7 @@ struct OpeningScreen: View {
 
                 ResultRosterCard(
                     rows: rows,
-                    usesCompactRows: mode != .opening,
-                    revealsOnAppear: mode == .opening
+                    usesCompactRows: mode != .opening
                 )
 
                 ResultVerification(
@@ -1073,8 +1035,7 @@ private struct LocalResultScreen: View {
     private func openedRoster(_ result: LocalRoundResult) -> some View {
         ResultRosterCard(
             rows: [ResultRosterItem(name: "You", value: openedLabel(result))],
-            revealsOnAppear: result.stage == .revealed && destination == .opening,
-            hapticOnOwnReveal: true
+            hapticOnOwnReveal: result.stage == .revealed && destination == .opening
         )
     }
 
@@ -1359,14 +1320,9 @@ private struct ResultRosterItem {
 private struct ResultRosterCard: View {
     let rows: [ResultRosterItem]
     var usesCompactRows = false
-    var revealsOnAppear = false
     var hapticOnOwnReveal = false
     var showsVerdict = false
     @Environment(AppModel.self) private var model
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.slipAccessibility) private var accessibility
-    @State private var revealedRows: Set<Int> = []
-    @State private var revealTask: Task<Void, Never>?
     @State private var deliveredOwnRevealHaptic = false
 
     var body: some View {
@@ -1385,67 +1341,19 @@ private struct ResultRosterCard: View {
                                 : ResultLayout.standardDividerInset)
                         }
                     }
-                    .modifier(ResultRevealModifier(
-                        isRevealed: isRowRevealed(at: index),
-                        reduceMotion: shouldReduceMotion
-                    ))
                 }
             }
         }
-        .onAppear {
-            beginRevealIfNeeded()
-        }
-        .onDisappear {
-            revealTask?.cancel()
-            revealTask = nil
-            revealedRows = RevealMotionPlan.completedRows(
-                afterCancelling: revealedRows,
-                participatingIndices: rows.indices.filter { rowParticipatesInReveal(at: $0) }
-            )
+        .onChange(of: shouldDeliverOwnRevealHaptic, initial: true) { _, shouldDeliver in
+            guard shouldDeliver, !deliveredOwnRevealHaptic else { return }
+            deliveredOwnRevealHaptic = true
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
 
-    private var shouldReduceMotion: Bool {
-        reduceMotion || accessibility.reduceMotion
-    }
-
-    private func rowParticipatesInReveal(at index: Int) -> Bool {
-        revealsOnAppear && rows[index].value != nil
-    }
-
-    private func isRowRevealed(at index: Int) -> Bool {
-        !rowParticipatesInReveal(at: index) || model.isPreview || revealedRows.contains(index)
-    }
-
-    @MainActor private func beginRevealIfNeeded() {
-        guard revealsOnAppear, !model.isPreview, revealTask == nil, revealedRows.isEmpty else { return }
-        let animatedIndices = rows.indices.filter { rowParticipatesInReveal(at: $0) }
-        let animation: Animation = shouldReduceMotion
-            ? .easeOut(duration: SlipMotion.revealDuration)
-            : .spring(duration: SlipMotion.revealDuration, bounce: RevealMotionPlan.noBounce)
-
-        revealTask = Task { @MainActor in
-            var previousDelay = TimeInterval.zero
-            for index in animatedIndices {
-                let scheduledDelay = RevealMotionPlan.delay(forRowAt: index)
-                let incrementalDelay = scheduledDelay - previousDelay
-                if incrementalDelay > .zero {
-                    try? await Task.sleep(for: .seconds(incrementalDelay))
-                }
-                guard !Task.isCancelled else { return }
-
-                withAnimation(animation) {
-                    _ = revealedRows.insert(index)
-                }
-
-                if hapticOnOwnReveal, rows[index].name == "You", !deliveredOwnRevealHaptic {
-                    deliveredOwnRevealHaptic = true
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                }
-                previousDelay = scheduledDelay
-            }
-            revealTask = nil
-        }
+    private var shouldDeliverOwnRevealHaptic: Bool {
+        // Opening feedback never gates roster visibility or fires for preview fixtures.
+        hapticOnOwnReveal && !model.isPreview && rows.contains { $0.name == "You" && $0.value != nil }
     }
 }
 
@@ -1509,7 +1417,9 @@ private struct ResultRosterRow: View {
 
     @ViewBuilder private func trailing(isTrailing: Bool) -> some View {
         HStack(alignment: .center, spacing: SlipSpacing.medium) {
-            if let value = item.value {
+            if let sealed = item.sealed {
+                SealStatusTag(sealed: sealed)
+            } else if let value = item.value {
                 VStack(alignment: isTrailing ? .trailing : .leading, spacing: SlipSpacing.micro) {
                     Text(value)
                         .font(SlipFont.bodyBold)
@@ -1523,7 +1433,6 @@ private struct ResultRosterRow: View {
                     }
                 }
             }
-            if item.value == nil, let sealed = item.sealed { SealStatusTag(sealed: sealed) }
             if let score = item.score {
                 Text(score)
                     .font(SlipFont.bodyBold)
@@ -1531,27 +1440,6 @@ private struct ResultRosterRow: View {
                     .frame(minWidth: SlipSize.minimumTap, alignment: .trailing)
             }
         }
-    }
-}
-
-private struct ResultRevealModifier: ViewModifier {
-    let isRevealed: Bool
-    let reduceMotion: Bool
-
-    func body(content: Content) -> some View {
-        let state = RevealMotionPlan.visualState(isRevealed: isRevealed, reduceMotion: reduceMotion)
-        content
-            .opacity(state.opacity)
-            .accessibilityHidden(!isRevealed)
-            .rotation3DEffect(
-                .degrees(state.rotationDegrees),
-                axis: (
-                    x: RevealMotionPlan.axisX,
-                    y: RevealMotionPlan.axisY,
-                    z: RevealMotionPlan.axisZ
-                ),
-                perspective: RevealMotionPlan.perspective
-            )
     }
 }
 

@@ -121,7 +121,7 @@ struct SealStatusTag: View {
         Group {
             if sealed {
                 Text("\(Image(systemName: "circle.fill")) Sealed")
-                    .foregroundStyle(SlipColor.seal)
+                    .foregroundStyle(SlipColor.sealText)
             } else {
                 Text("Waiting").foregroundStyle(SlipColor.secondary)
             }

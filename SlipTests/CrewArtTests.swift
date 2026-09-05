@@ -4,6 +4,33 @@ import UIKit
 
 @MainActor
 struct CrewArtTests {
+    @Test("Inline seal text clears AA on both status surfaces in both appearances")
+    func sealTextContrast() {
+        func luminance(_ color: UIColor, traits: UITraitCollection) -> Double {
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            var alpha: CGFloat = 0
+            #expect(color.resolvedColor(with: traits).getRed(&red, green: &green, blue: &blue, alpha: &alpha))
+            #expect(alpha == 1)
+            func linear(_ value: CGFloat) -> Double {
+                let channel = Double(value)
+                return channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
+        }
+        for (name, style) in [("light", UIUserInterfaceStyle.light), ("dark", .dark)] {
+            let traits = UITraitCollection(userInterfaceStyle: style)
+            let foreground = luminance(UIColor(SlipColor.sealText), traits: traits)
+            for (surface, color) in [("background", SlipColor.background), ("card", SlipColor.card)] {
+                let ground = luminance(UIColor(color), traits: traits)
+                let ratio = (max(foreground, ground) + 0.05) / (min(foreground, ground) + 0.05)
+                print("sealText contrast \(name) \(surface): \(ratio):1")
+                #expect(ratio >= 4.5)
+            }
+        }
+    }
+
     @Test("Crew identity uses stable UTF-8 DJB2 vectors, including overflow")
     func fixedHashVectors() {
         // Fixed independent vectors catch process-randomized hashing, character

@@ -9,6 +9,8 @@ enum SlipColor {
     static let ink = adaptive(light: 0x17171A, dark: 0xF2F2F7)
     static let secondary = adaptive(light: 0x66666E, dark: 0x98989F)
     static let seal = fixed(0xC63A2B)
+    // Small status text needs its own scheme pair; actions and wax retain seal.
+    static let sealText = adaptive(light: 0xC63A2B, dark: 0xE45D4E)
     static let sealTint = adaptive(light: 0xFAE8E5, dark: 0x3B211E)
     static let sealDeep = fixed(0x8E241A)   // debossed groove on the wax-seal mark
     static let win = adaptive(light: 0x1F7A43, dark: 0x67D08F)
@@ -160,8 +162,6 @@ enum SlipMotion {
     static let pressDuration: TimeInterval = 0.15
     static let cancelDuration: TimeInterval = 0.2
     static let stampDuration: TimeInterval = 0.4
-    static let revealDuration: TimeInterval = 0.5
-    static let revealStagger: TimeInterval = 0.06
     static let stampStartScale: CGFloat = 1.15
     static let stampBounce: Double = 0.2
 }
