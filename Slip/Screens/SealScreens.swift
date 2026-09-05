@@ -173,7 +173,7 @@ struct SealScreen: View {
                         }
                     }
                     .scaleEffect(hold.began != nil && !(reduceMotion || accessibility.reduceMotion) ? SlipMotion.pressScale : SlipOpacity.opaque)
-                    .animation(.easeOut(duration: SlipMotion.pressDuration), value: hold.began != nil)
+                    .animation(reduceMotion || accessibility.reduceMotion ? nil : .easeOut(duration: SlipMotion.pressDuration), value: hold.began != nil)
                     .onLongPressGesture(minimumDuration: SlipMotion.holdDuration, maximumDistance: SlipSize.minimumTap,
                         pressing: { pressing in
                             if pressing {
@@ -375,7 +375,7 @@ struct TicketScreen: View {
                 guard !model.isPreview, receipt != nil,
                       flow.consumeSealFeedback(roundID: model.localRound.id) else { stamped = true; return }
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                withAnimation(reduceMotion || accessibility.reduceMotion ? .easeOut(duration: SlipMotion.cancelDuration)
+                withAnimation(reduceMotion || accessibility.reduceMotion ? nil
                               : .spring(duration: SlipMotion.stampDuration, bounce: SlipMotion.stampBounce)) {
                     stamped = true
                 }
@@ -395,7 +395,6 @@ struct TicketScreen: View {
                     .accessibilityLabel(peek.isVisible ? "Your pick: \(sealedChoice)" : "Your pick is concealed")
                 SealMark(size: SlipSize.sealDisc)
                     .scaleEffect(stamped || model.isPreview || reduceMotion || accessibility.reduceMotion ? SlipOpacity.opaque : SlipMotion.stampStartScale)
-                    .opacity(stamped || model.isPreview || !(reduceMotion || accessibility.reduceMotion) ? SlipOpacity.opaque : SlipSpacing.zero)
                 Text("Hold to peek").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)
             }
             .modifier(SealedPickAccessibilityModifier(enabled: true,

@@ -353,7 +353,7 @@ struct SlipPressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed && !motionReduced ? SlipMotion.pressScale : SlipOpacity.opaque)
             .opacity(configuration.isPressed && motionReduced ? SlipOpacity.strong : SlipOpacity.opaque)
-            .animation(.easeOut(duration: SlipMotion.pressDuration), value: configuration.isPressed)
+            .animation(motionReduced ? nil : .easeOut(duration: SlipMotion.pressDuration), value: configuration.isPressed)
     }
 }
 
