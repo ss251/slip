@@ -135,7 +135,12 @@ enum SlipStroke {
     static let dashed: [CGFloat] = [4, 4]
 }
 
+enum SlipPriority {
+    static let primary: Double = 1
+}
+
 enum SlipOpacity {
+    static let wordmark: Double = 0.5
     static let ambientWash: Double = 0.35
     static let ambientOverlay: Double = 0.55
     // Additional depth is necessary: flat ambient alone gives onTicket only 6.39:1.

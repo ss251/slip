@@ -273,21 +273,34 @@ struct YouScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: SlipSpacing.screen) {
-                profileHeader
-                profileIdentity
-                stats
-                history
-                    .padding(.top, SlipSpacing.tiny)
-                settings
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: SlipSpacing.screen) {
+                    profileHeader
+                    profileIdentity
+                    stats
+                    history
+                        .padding(.top, SlipSpacing.tiny)
+                    settings
+                    ProfileFooter()
+                }
+                .padding(.horizontal, SlipSpacing.screen)
+                .padding(.top, SlipSpacing.large)
+                // Root scroll chrome already supplies the remaining 8pt of clearance.
+                .padding(.bottom, SlipSpacing.standard)
+                .id("profile-footer")
             }
-            .padding(.horizontal, SlipSpacing.screen)
-            .padding(.top, SlipSpacing.large)
-            .padding(.bottom, SlipSpacing.section)
+            .scrollIndicators(.hidden)
+            .accessibilityIdentifier("you")
+            #if DEBUG
+            .task {
+                // Review-only scrolling uses synthetic preview data and no animation.
+                if model.isPreview && ProcessInfo.processInfo.arguments.contains("--profile-footer") {
+                    proxy.scrollTo("profile-footer", anchor: .bottom)
+                }
+            }
+            #endif
         }
-        .scrollIndicators(.hidden)
-        .accessibilityIdentifier("you")
     }
 
     private var profileHeader: some View {
@@ -398,23 +411,23 @@ struct YouScreen: View {
     private var settings: some View {
         SlipCard(padding: SlipSpacing.zero) {
             VStack(spacing: SlipSpacing.zero) {
-                ProfileSettingRow(title: "Notifications", detail: "Opens and nudges") {
+                ProfileSettingRow(title: "Notifications", symbol: "bell", detail: "Opens and nudges") {
                     model.inform("Notification settings open after app permissions are connected.")
                 }
                 InsetDivider(inset: SlipSpacing.standard)
-                ProfileSettingRow(title: "Appearance", detail: "Match iPhone") {
+                ProfileSettingRow(title: "Appearance", symbol: "circle.lefthalf.filled", detail: "Match iPhone") {
                     model.inform("Slip currently follows your iPhone appearance.")
                 }
                 InsetDivider(inset: SlipSpacing.standard)
-                ProfileSettingRow(title: "Your receipts", detail: "Every proof this iPhone made") {
+                ProfileSettingRow(title: "Your receipts", symbol: "doc.text", detail: "Every proof this iPhone made") {
                     model.inform("Receipt history is local-only and will appear after you seal a pick.")
                 }
                 InsetDivider(inset: SlipSpacing.standard)
-                ProfileSettingRow(title: "Steward relay", detail: networkTracker?.relayHost ?? "Not connected") {
+                ProfileSettingRow(title: "Steward relay", symbol: "antenna.radiowaves.left.and.right", detail: networkTracker?.relayHost ?? "Not connected") {
                     model.inform(networkTracker?.relayHost == nil ? "Launch with --relay and --contract, or ask your steward for a setup link." : "Sealed picks are handed to this steward, who pays the fee and posts them.")
                 }
                 InsetDivider(inset: SlipSpacing.standard)
-                ProfileSettingRow(title: "Your member id", detail: networkTracker?.memberIDHex.map { "\($0.prefix(6))…\($0.suffix(4))" } ?? "Made when you connect", machine: networkTracker?.memberIDHex != nil) {
+                ProfileSettingRow(title: "Your member id", symbol: "person.crop.square", detail: networkTracker?.memberIDHex.map { "\($0.prefix(6))…\($0.suffix(4))" } ?? "Made when you connect", machine: networkTracker?.memberIDHex != nil) {
                     if let id = networkTracker?.memberIDHex {
                         UIPasteboard.general.string = id
                         model.inform("Copied. Send it to your steward to be enrolled — it reveals nothing about your picks.")
@@ -513,6 +526,7 @@ private struct ProfileHistoryRow: View {
 
 private struct ProfileSettingRow: View {
     let title: String
+    let symbol: String
     let detail: String
     var machine: Bool = false
     let action: () -> Void
@@ -520,37 +534,60 @@ private struct ProfileSettingRow: View {
 
     var body: some View {
         Button(action: action) {
-            Group {
-                if typeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: SlipSpacing.small) {
-                        Text(title).font(SlipFont.body).foregroundStyle(SlipColor.ink)
-                        HStack(spacing: SlipSpacing.small) {
-                            Text(detail).font(machine ? SlipFont.machine : SlipFont.footnote).foregroundStyle(SlipColor.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: SlipSpacing.small)
-                            Image(systemName: "chevron.right")
-                                .font(SlipFont.footnoteBold)
-                                .foregroundStyle(SlipColor.secondary)
-                        }
-                    }
-                } else {
-                    HStack(spacing: SlipSpacing.medium) {
-                        Text(title).font(SlipFont.body).foregroundStyle(SlipColor.ink)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(detail).font(machine ? SlipFont.machine : SlipFont.footnote).foregroundStyle(SlipColor.secondary)
-                            .multilineTextAlignment(.trailing)
-                            .fixedSize(horizontal: true, vertical: false)
-                        Image(systemName: "chevron.right")
-                            .font(SlipFont.footnoteBold)
-                            .foregroundStyle(SlipColor.secondary)
-                    }
-                }
+            HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.medium) {
+                Image(systemName: symbol).resizable().scaledToFit()
+                    .foregroundStyle(SlipColor.secondary)
+                    .frame(width: SlipSize.icon, height: SlipSize.icon)
+                    .accessibilityHidden(true)
+                let layout = typeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.small))
+                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SlipSpacing.medium))
+                layout {
+                    Text(title).font(SlipFont.body).foregroundStyle(SlipColor.ink)
+                        .fixedSize(horizontal: !typeSize.isAccessibilitySize, vertical: true)
+                        .layoutPriority(SlipPriority.primary)
+                    if !typeSize.isAccessibilitySize { Spacer(minLength: SlipSpacing.tiny) }
+                    Text(detail).font(machine ? SlipFont.machine : SlipFont.footnote)
+                        .foregroundStyle(SlipColor.secondary)
+                        .multilineTextAlignment(typeSize.isAccessibilitySize ? .leading : .trailing)
+                        .fixedSize(horizontal: false, vertical: true)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right").font(SlipFont.footnoteBold)
+                    .foregroundStyle(SlipColor.secondary).accessibilityHidden(true)
             }
             .padding(SlipSpacing.standard)
             .frame(minHeight: SlipSize.minimumTap)
             .contentShape(Rectangle())
         }
         .buttonStyle(SlipPressStyle())
+    }
+}
+
+private struct ProfileFooter: View {
+    var body: some View {
+        VStack(spacing: SlipSpacing.tiny) {
+            Text("Slip").font(SlipFont.footnote).opacity(SlipOpacity.wordmark)
+            Text(version).font(SlipFont.caption)
+            Text("Terms · Privacy").font(SlipFont.caption)
+        }
+        .foregroundStyle(SlipColor.secondary)
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .padding(.top, SlipSpacing.large)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var version: String {
+        // Generated development builds omit Apple's version keys when their build
+        // settings are empty. Prefer release metadata, then the local app metadata.
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? Bundle.main.object(forInfoDictionaryKey: "SlipDevelopmentVersion") as? String
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+            ?? Bundle.main.object(forInfoDictionaryKey: "SlipDevelopmentBuild") as? String
+        guard let version, let build else {
+            return "Development build"
+        }
+        return "Version \(version) (\(build))"
     }
 }
 
