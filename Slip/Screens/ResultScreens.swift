@@ -659,7 +659,7 @@ struct SettleScreen: View {
             VStack(alignment: .leading, spacing: SlipSpacing.large) {
                 SheetHeading(title: "Call it")
                 if !model.isPreview { FixtureDisclosure() }
-                ContextRow(detail: "Saturday crew · 5 of 5 opened · your call")
+                ContextRow(detail: "5 of 5 opened · your call")
                 Text("What happened?")
                     .font(SlipFont.large)
                     .foregroundStyle(SlipColor.ink)

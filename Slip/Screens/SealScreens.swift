@@ -28,9 +28,9 @@ struct SealScreen: View {
             ScrollView {
                 VStack(spacing: SlipSpacing.screen) {
                     SheetHeading(title: already ? "Already sealed" : proving ? "Sealing" : "Seal your pick", light: true)
-                    ContextRow(detail: model.isPreview ? "Saturday crew · 3 of 5 sealed"
-                               : "\(model.localRound.crewName) · local proof only", light: true,
-                               crewID: model.isPreview ? PreviewContent.crew : model.localRound.crewName)
+                    ContextRow(detail: model.isPreview ? "3 of 5 sealed" : "local proof only", light: true,
+                               crewID: model.isPreview ? PreviewContent.crew : model.localRound.crewName,
+                               symbol: model.isPreview ? "person.2" : "iphone")
                     pickCard.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
                     if already {
                         explanation("You sealed this on this iPhone", "A sealed pick can’t be changed or sealed twice. That’s the whole point.")

@@ -69,6 +69,7 @@ struct ArtBackdrop: View {
 /// The shared who/what/when grammar keeps status attached to identity as text grows.
 struct CrewIdentityLine<Status: View>: View {
     let crew: String
+    var foreground: Color = SlipColor.secondary
     @ViewBuilder var status: Status
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -79,7 +80,7 @@ struct CrewIdentityLine<Status: View>: View {
         layout {
             HStack(spacing: SlipSpacing.tiny) {
                 CrewArt(size: SlipSize.artIdentity, crewID: crew)
-                Text(crew).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                Text(crew).font(SlipFont.footnote).foregroundStyle(foreground)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !typeSize.isAccessibilitySize { Spacer(minLength: SlipSpacing.tiny) }
@@ -91,13 +92,14 @@ struct CrewIdentityLine<Status: View>: View {
 struct RowMetadata: View {
     let symbol: String
     let text: String
+    var foreground: Color = SlipColor.secondary
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.tiny) {
             Image(systemName: symbol).accessibilityHidden(true)
             Text(text).fixedSize(horizontal: false, vertical: true)
         }
         .font(SlipFont.footnote).fontWeight(.regular)
-        .foregroundStyle(SlipColor.secondary)
+        .foregroundStyle(foreground)
         .multilineTextAlignment(.leading)
     }
 }
@@ -249,18 +251,18 @@ struct FormHeading: View {
 }
 
 struct ContextRow: View {
-    var detail = "Saturday crew · 3 of 5 sealed"
+    var detail = "3 of 5 sealed"
     var light = false
     var crewID: String = PreviewContent.crew
-    @Environment(\.dynamicTypeSize) private var typeSize
+    var symbol = "person.2"
     @Environment(AppModel.self) private var model
     var body: some View {
-        HStack(spacing: SlipSpacing.medium) {
-            if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.artSmall, crewID: crewID) }
-            VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-                Text(model.sampleQuestion).font(SlipFont.headline).fixedSize(horizontal: false, vertical: true)
-                Text(detail).font(SlipFont.footnote).foregroundStyle(light ? SlipColor.onTicket : SlipColor.secondary)
+        VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+            CrewIdentityLine(crew: crewID, foreground: light ? SlipColor.onTicket : SlipColor.secondary) {
+                EmptyView()
             }
+            Text(model.sampleQuestion).font(SlipFont.headline).fixedSize(horizontal: false, vertical: true)
+            RowMetadata(symbol: symbol, text: detail, foreground: light ? SlipColor.onTicket : SlipColor.secondary)
         }.foregroundStyle(light ? SlipColor.onSeal : SlipColor.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
