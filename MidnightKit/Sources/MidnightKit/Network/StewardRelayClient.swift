@@ -38,7 +38,13 @@ public enum RelayError: Error, Equatable, Sendable {
 public struct HTTPStewardRelay: StewardRelay {
     public let baseURL: URL
     private let session: URLSession
-    public init(baseURL: URL, session: URLSession = .shared) { self.baseURL = baseURL; self.session = session }
+    /// Bearer token the relay requires; sent on every request, never logged.
+    private let authToken: String?
+    public init(baseURL: URL, authToken: String? = nil, session: URLSession = .shared) { self.baseURL = baseURL; self.authToken = authToken; self.session = session }
+
+    private func authorize(_ request: inout URLRequest) {
+        if let authToken { request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization") }
+    }
 
     private struct ContextDTO: Decodable { let address: String; let stateHex: String; let blockTimeSecs: UInt64 }
     private struct ConfirmDTO: Decodable { let status: ConfirmationStatus }
@@ -54,6 +60,7 @@ public struct HTTPStewardRelay: StewardRelay {
         request.httpMethod = "POST"
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         request.httpBody = provedTransaction
+        authorize(&request)
         let (data, response) = try await session.data(for: request)
         try Self.check(response)
         return try JSONDecoder().decode(SubmissionReceipt.self, from: data)
@@ -65,7 +72,9 @@ public struct HTTPStewardRelay: StewardRelay {
     }
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
-        let (data, response) = try await session.data(from: baseURL.appendingPathComponent(path))
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        authorize(&request)
+        let (data, response) = try await session.data(for: request)
         try Self.check(response)
         return try JSONDecoder().decode(T.self, from: data)
     }

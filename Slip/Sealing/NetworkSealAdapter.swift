@@ -25,7 +25,15 @@ enum NetworkSealAdapter {
         { round, choice in
             guard let side = round.sideLabel(for: choice) else { throw AppSealError.invalidChoice }
             let sealedAt = Date()
-            let network = try await service.seal(choice: choice)
+            let network: NetworkSealReceipt
+            do { network = try await service.seal(choice: choice) } catch {
+                #if DEBUG
+                // Diagnostics only: the error's type and code, never payload bytes, tokens or witness data.
+                let code = (error as? URLError)?.code.rawValue
+                print("network seal failed: \(type(of: error)).\(String(describing: error).prefix(80))\(code.map { " urlError=\($0)" } ?? "")")
+                #endif
+                throw error
+            }
             await tracker.record(network, for: round.id)
             let receipt = LocalSealReceipt(
                 roundID: round.id,
@@ -51,7 +59,7 @@ enum NetworkSealAdapter {
     static func makeFlow(setup: NetworkSetup?, tracker: NetworkSealTracker, secretStore: any SecretStore = KeychainSecretStore()) -> SealFlowModel {
         guard let setup, let secret = try? DeviceIdentity.secret(store: secretStore) else { return SealFlowModel() }
         let service = NetworkSealingService(
-            relay: HTTPStewardRelay(baseURL: setup.relayURL),
+            relay: HTTPStewardRelay(baseURL: setup.relayURL, authToken: setup.relayToken),
             prover: Prover(artifacts: LocalSealingService.bundledArtifacts()),
             contractAddressHex: setup.contractAddressHex,
             deviceSecret: secret)

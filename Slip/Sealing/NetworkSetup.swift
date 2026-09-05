@@ -6,23 +6,27 @@ import Security
 struct NetworkSetup: Equatable, Sendable {
     let relayURL: URL
     let contractAddressHex: String
+    /// Relay bearer token. Kept in UserDefaults for the demo; it authorises relay use, not picks.
+    var relayToken: String? = nil
 
     static let relayKey = "slip.network.relayURL"
     static let contractKey = "slip.network.contractAddress"
+    static let tokenKey = "slip.network.relayToken"
 
     static func load(defaults: UserDefaults = .standard) -> NetworkSetup? {
         guard let url = defaults.string(forKey: relayKey).flatMap(URL.init(string:)),
               let address = defaults.string(forKey: contractKey), Self.isAddress(address) else { return nil }
-        return NetworkSetup(relayURL: url, contractAddressHex: address)
+        return NetworkSetup(relayURL: url, contractAddressHex: address, relayToken: defaults.string(forKey: tokenKey))
     }
 
     func save(defaults: UserDefaults = .standard) {
         defaults.set(relayURL.absoluteString, forKey: Self.relayKey)
         defaults.set(contractAddressHex, forKey: Self.contractKey)
+        defaults.set(relayToken, forKey: Self.tokenKey)
     }
 
     static func clear(defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: relayKey); defaults.removeObject(forKey: contractKey)
+        defaults.removeObject(forKey: relayKey); defaults.removeObject(forKey: contractKey); defaults.removeObject(forKey: tokenKey)
     }
 
     /// `--relay <url> --contract <64-hex>` (DEBUG launches, simctl).
@@ -32,7 +36,7 @@ struct NetworkSetup: Equatable, Sendable {
             return arguments[i + 1]
         }
         guard let url = value("--relay").flatMap(URL.init(string:)), let address = value("--contract"), isAddress(address) else { return nil }
-        return NetworkSetup(relayURL: url, contractAddressHex: address)
+        return NetworkSetup(relayURL: url, contractAddressHex: address, relayToken: value("--relay-token"))
     }
 
     static func isAddress(_ hex: String) -> Bool { hex.count == 64 && Data(hex: hex) != nil }

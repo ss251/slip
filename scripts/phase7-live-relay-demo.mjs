@@ -360,7 +360,12 @@ async function main() {
     const contractAddress = deployed.deployTxData.public.contractAddress;
     console.log(`phase7: deployed ${contractAddress}`);
 
-    const memberID = pureCircuits.memberIdOf(syntheticSecret);
+    // SLIP_MEMBER_ID (64 hex): enrol a real device's PUBLIC member id instead of the synthetic
+    // member, so a phone can seal against this round. Public data only.
+    const memberID = process.env.SLIP_MEMBER_ID
+      ? Uint8Array.from(Buffer.from(process.env.SLIP_MEMBER_ID, 'hex'))
+      : pureCircuits.memberIdOf(syntheticSecret);
+    assert.equal(memberID.length, 32, 'SLIP_MEMBER_ID must be 32 bytes of hex');
     const enrollment = await submitCallTx(standardProviders, {
       compiledContract: compiled,
       contractAddress,
@@ -389,16 +394,40 @@ async function main() {
     const relayConfiguration = loadRelayConfiguration({
       SLIP_RELAY_TOKEN: relayToken,
       SLIP_CONTRACT_ADDRESS: contractAddress,
+      // Serve mode may bind beyond loopback for a phone on the LAN (explicit opt-in).
+      SLIP_RELAY_HOST: process.env.SLIP_RELAY_HOST,
+      SLIP_RELAY_ALLOW_LAN: process.env.SLIP_RELAY_ALLOW_LAN,
+      SLIP_RELAY_PORT: process.env.SLIP_RELAY_PORT,
     });
     relayRuntime = await createStewardRuntime(relayConfiguration);
+    const serving = process.env.SLIP_RELAY_SERVE === '1';
+    // serve-mode diagnostics: error MESSAGES only (never transaction bytes, tokens or keys).
+    const diag = (label, fn) => async (...args) => {
+      try { return await fn(...args); } catch (error) {
+        if (serving) console.error(`relay ${label} failed: ${error?.constructor?.name ?? 'Error'} — ${String(error?.message ?? error).slice(0, 300)}`);
+        throw error;
+      }
+    };
     relayServer = createRelayServer({
       configuration: relayConfiguration,
-      getContext: relayRuntime.getContext,
-      submit: relayRuntime.submit,
-      confirm: relayRuntime.confirm,
+      getContext: diag('context', relayRuntime.getContext),
+      submit: diag('submit', relayRuntime.submit),
+      confirm: diag('confirm', relayRuntime.confirm),
+      logger: serving ? { error: (event) => console.error(`relay: ${event}`) } : {},
     });
     const relayBaseURL = await listen(relayServer);
     console.log('phase7: authenticated relay listening on loopback');
+    if (process.env.SLIP_RELAY_SERVE === '1') {
+      // Serve mode: hand the round to a real device and keep the relay up until SIGINT.
+      // The token is printed ONCE here for the operator; it is never logged elsewhere.
+      console.log(`SLIP_RELAY_URL=${relayBaseURL}`);
+      console.log(`SLIP_RELAY_TOKEN=${relayToken}`);
+      console.log(`SLIP_CONTRACT_ADDRESS=${contractAddress}`);
+      console.log('phase7: SERVING — press Ctrl-C to stop');
+      await new Promise((resolve) => process.once('SIGINT', resolve));
+      console.log('phase7: serve mode stopped by operator');
+      return;
+    }
 
     const healthResponse = await fetch(`${relayBaseURL}/health`);
     assert.equal(healthResponse.status, 200, 'relay health check failed');

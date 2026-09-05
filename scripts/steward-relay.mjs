@@ -656,16 +656,54 @@ export async function queryLatestBlock(
   });
 }
 
+/// The indexer's block-pinned contract-state lookup answers only for blocks that CONTAIN an
+/// action of that contract; pinning to the chain head returns null once the head has moved
+/// past the contract's last action (verified against the local indexer, 2026-09-05). The
+/// state as of the contract's latest action IS its current state, so pin to that block and
+/// report the chain head's time as the device's tblock.
+export async function queryLatestContractActionBlock(
+  indexerURL,
+  address,
+  fetchImplementation = fetch,
+  timeoutMilliseconds = READ_TIMEOUT_MILLISECONDS,
+) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMilliseconds);
+  timeout.unref?.();
+  let payload;
+  try {
+    const response = await fetchImplementation(indexerURL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query: `{ contractAction(address: "${address}") { transaction { block { height hash timestamp } } } }` }),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('indexer contract action query failed');
+    payload = await response.json();
+  } catch {
+    throw new Error('indexer contract action query failed');
+  } finally {
+    clearTimeout(timeout);
+  }
+  const block = payload?.data?.contractAction?.transaction?.block;
+  if (!block || typeof block.hash !== 'string' || !/^[0-9a-f]{64}$/.test(block.hash)) {
+    throw new Error('contract has no indexed action');
+  }
+  return Object.freeze({ height: block.height, hash: block.hash });
+}
+
 export async function fetchContractContext({
   address,
   indexerURL,
   publicDataProvider,
   latestBlock = queryLatestBlock,
+  latestActionBlock = queryLatestContractActionBlock,
 }) {
   const block = await latestBlock(indexerURL);
+  const actionBlock = await latestActionBlock(indexerURL, address);
   const state = await withReadTimeout(publicDataProvider.queryContractState(address, {
     type: 'blockHash',
-    blockHash: block.hash,
+    blockHash: actionBlock.hash,
   }));
   if (!state) throw new Error('contract state unavailable');
   return Object.freeze({

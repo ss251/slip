@@ -22,13 +22,14 @@ struct StewardRelayClientTests {
     static func relay() -> HTTPStewardRelay {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [Stub.self]
-        return HTTPStewardRelay(baseURL: URL(string: "http://relay.test")!, session: URLSession(configuration: config))
+        return HTTPStewardRelay(baseURL: URL(string: "http://relay.test")!, authToken: "s3cret", session: URLSession(configuration: config))
     }
 
     @Test("context decodes hex state and seconds block time")
     func context() async throws {
         Stub.handler = { req in
             #expect(req.url?.path == "/context/" + String(repeating: "11", count: 32))
+            #expect(req.value(forHTTPHeaderField: "Authorization") == "Bearer s3cret")
             return (200, Data(#"{"address":"\#(String(repeating: "11", count: 32))","stateHex":"0a0b0c","blockTimeSecs":1788000600}"#.utf8))
         }
         let ctx = try await Self.relay().context(for: String(repeating: "11", count: 32))
@@ -40,6 +41,7 @@ struct StewardRelayClientTests {
     func submit() async throws {
         Stub.handler = { req in
             #expect(req.httpMethod == "POST")
+            #expect(req.value(forHTTPHeaderField: "Authorization") == "Bearer s3cret")
             #expect(req.value(forHTTPHeaderField: "Content-Type") == "application/octet-stream")
             return (200, Data(#"{"txId":"0xabc"}"#.utf8))
         }

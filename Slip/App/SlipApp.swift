@@ -1,3 +1,4 @@
+import MidnightKit
 import SwiftUI
 
 @main
@@ -63,6 +64,19 @@ struct SlipApp: App {
         }
         _networkTracker = State(initialValue: tracker)
         _flow = State(initialValue: selectedFixture?.makeFlow(round: appModel.localRound) ?? NetworkSealAdapter.makeFlow(setup: setup, tracker: tracker))
+        if arguments.contains("--print-member-id") {
+            // Headless enrolment aid: the PUBLIC member id only (memberIdOf(secret)), on stdout.
+            Task { @MainActor in
+                for _ in 0..<200 where tracker.memberIDHex == nil { try? await Task.sleep(for: .milliseconds(25)) }
+                if let id = tracker.memberIDHex { print("SLIP_MEMBER_ID=\(id)") } else {
+                    let secret = try? DeviceIdentity.secret()
+                    if let secret, let rt = try? ContractRuntime() {
+                        let id = try? rt.evaluate("(function(){ const C = __slipContract; const s = new Uint8Array([\(secret.map { String($0) }.joined(separator: ","))]); return Array.from(C.pureCircuits.memberIdOf(s)).map(b => b.toString(16).padStart(2,'0')).join(''); })()")
+                        print("SLIP_MEMBER_ID=\(id ?? "unavailable")")
+                    }
+                }
+            }
+        }
         #else
         let setup = NetworkSetup.load()
         let tracker = NetworkSealTracker(relayHost: setup?.relayURL.host)

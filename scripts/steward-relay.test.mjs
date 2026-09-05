@@ -391,7 +391,10 @@ test('latest block parsing preserves the hash fence and converts milliseconds on
   assert.deepEqual(result, { height: 42, hash: 'ab'.repeat(32), seconds: 1_788_547_201 });
 });
 
-test('contract context serializes state from the exact latest block hash', async () => {
+test('contract context pins state to the contract\'s latest action block and reports head time', async () => {
+  // The indexer answers block-pinned state lookups only for blocks containing an action of
+  // the contract; the head block usually does not. Pin to the last action block (which IS
+  // the current state) and take tblock from the chain head.
   const calls = [];
   const result = await fetchContractContext({
     address,
@@ -399,6 +402,10 @@ test('contract context serializes state from the exact latest block hash', async
     latestBlock: async (url) => {
       calls.push(['block', url]);
       return { hash: 'ab'.repeat(32), seconds: 1_788_547_222 };
+    },
+    latestActionBlock: async (url, requestedAddress) => {
+      calls.push(['action', url, requestedAddress]);
+      return { height: 2_804, hash: 'cd'.repeat(32) };
     },
     publicDataProvider: {
       queryContractState: async (requestedAddress, fence) => {
@@ -409,7 +416,8 @@ test('contract context serializes state from the exact latest block hash', async
   });
   assert.deepEqual(calls, [
     ['block', 'http://indexer.invalid/graphql'],
-    ['state', address, { type: 'blockHash', blockHash: 'ab'.repeat(32) }],
+    ['action', 'http://indexer.invalid/graphql', address],
+    ['state', address, { type: 'blockHash', blockHash: 'cd'.repeat(32) }],
   ]);
   assert.equal(result.address, address);
   assert.deepEqual(result.state, Buffer.of(4, 5, 6));
