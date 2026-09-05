@@ -2,7 +2,7 @@
 
 Sealed predictions with friends. Pick a side, keep it hidden, then prove that your opening matches your seal.
 
-Slip is an iOS pre-alpha for the AkinDo Buildathon, Wave 1 (2026-09-16). The current app is an **offline, single-player local round**: real Compact execution and native proof generation, with no wallet, transaction submission, indexer or connected crew. Group play is the product being built, not a shipped network feature.
+Slip is an iOS pre-alpha for the AkinDo Buildathon, Wave 1 (2026-09-16). By default, the app runs an **offline, single-player local round** with real Compact execution and native proof generation. Experimental undeployed-network components can also assemble and prove `sealPick` on device for handoff to a trusted developer relay. Connected crews are not shipped, and an authenticated physical-iPhone → relay → devnet run has not yet been demonstrated.
 
 Built on [Midnight](https://docs.midnight.network) and [Compact](https://docs.midnight.network/compact), using the `midnightntwrk` cryptography and ledger libraries through **MidnightKit**, our Swift/Rust layer.
 
@@ -15,13 +15,13 @@ Built on [Midnight](https://docs.midnight.network) and [Compact](https://docs.mi
 
 The actor retains the original device secret and pick only in memory. The circuit re-derives the same salt for reveal and rejects a flipped pick. Before opening, the pick is hidden by its commitment. On reveal the choice is deliberately public; the secret and derived salt stay local. There is no remote proving fallback, analytics or persistence. **Terminating the app loses this local session.** A proof of a matching opening is not a claim that nobody saw the unlocked phone.
 
-## Evidence, not a proof-server demo
+## Native proof and network evidence
 
 `ContractRuntime` executes compiler-generated JavaScript under JavaScriptCore. `Prover.prove(circuit:proofData:)` converts the private runtime transcript to a preimage in memory and generates the proof natively. Runtime input is never written out by the app.
 
 Physical-device run (2026-09-05, iPhone 15 Pro / A17 Pro, iOS 26.6.1, this app build): the sealing and round-flow suites pass on the phone (13 tests, 2 suites) and the complete local lifecycle proves all six circuits with real, round-bound proofs (3 tests). Earlier standalone benchmark (2026-09-03, same phone): `sealPick` key load **24 ms**, prove **1,776 ms**, **4,480 bytes**, peak RSS **290 MB** — see [MidnightKit measurements](.claude/docs/midnightkit.md).
 
-Current app gate (2026-09-05, iPhone 17 Pro simulator / iOS 27): **34 tests passed**, including six real-circuit proving cases, the complete lifecycle, and circuit-level mismatch rejection followed by recovery. One complete-round run measured:
+Current app gate (2026-09-05, iPhone 17 Pro simulator / iOS 27): **40 tests passed**, including six real-circuit proving cases, the complete lifecycle, circuit-level mismatch rejection followed by recovery, and the network-component boundary. One complete-round run measured:
 
 | Circuit | Prepare / replay | Key load | Prove | Proof bytes |
 |---|---:|---:|---:|---:|
@@ -43,7 +43,9 @@ Same lifecycle on the physical iPhone 15 Pro (iOS 26.6.1), one run, `LocalRoundS
 | `settle` | 34.5 ms | 13 ms | 1,046 ms | 4,480 |
 | `dispute` | 38.9 ms | 16 ms | 1,016 ms | 4,480 |
 
-Network path on the same phone (`NetworkSealingServiceTests` on device, stub relay serving the exported live contract state): `sealPick` executed against the live state in **9 ms**, transaction assembled and proved in process in **1,641 ms**, proved unbalanced transaction **5,238 bytes** — the device secret never appears in the submitted bytes. The relay balances and submits; network acceptance is established by the Phase 6 devnet referee (see `docs/phase6-sources.md`).
+Physical-device component run (`NetworkSealingServiceTests`, iPhone 15 Pro, stub relay): `sealPick` executed against an embedded post-create contract state in **9 ms**, then assembled and proved in process in **1,641 ms**, producing a **5,238-byte** proved/pre-binding transaction. The planted device-secret pattern was absent from the handed-off bytes. The stub only acknowledged submit and confirm; this run had no HTTP relay, steward wallet, node or indexer.
+
+Authenticated host relay demo (2026-09-05): a fresh local contract was deployed and prepared, Slip's native prover assembled the 5,238-byte `sealPick` transaction in **1,107 ms**, and the proved/pre-binding bytes crossed the bearer-authenticated steward relay. The node returned `SucceedEntirely` at block 2128; relay confirmation and an independent indexer read both found the exact expected commitment. This establishes the host producer → authenticated relay → local devnet path, not physical-iPhone provenance. The tooling proof service handled setup calls and the wallet's separate DUST balancing transaction; Slip's `sealPick` proof came from the native prover. See [Phase 6 sources](docs/phase6-sources.md) and [Phase 7 sources](docs/phase7-sources.md).
 
 Both tables are single-run observations (host CPU, then the phone), not latency promises or a performance budget. Preparation includes runtime initialization and replay of accepted steps; key/prove durations come from `Proof`. Reproduce the public-only `LOCAL_ROUND_PROOF` measurements with `LocalRoundServiceTests`. Local execution/proving does **not** establish network acceptance. Source decisions and version caveats: [Phase 4 sources](docs/phase4-sources.md).
 
@@ -79,6 +81,22 @@ xcodebuild test -scheme MidnightKit -destination 'platform=iOS Simulator,name=iP
 ```
 
 Parameter staging checks the official k13/k14 SHA-256 values and has no download fallback. Open the generated `Slip.xcodeproj`, choose Slip and a simulator, then Run. Repository signing uses personal team `L594CGSH6A`; contributors must use their own authorized signing configuration for any later device work.
+
+To reproduce the host relay component after the generated artifacts, e2e dependencies,
+native CLI and local Docker services are available:
+
+```sh
+(cd contracts && npm run devnet:up)
+(cd contracts/e2e && npm ci)
+node --test scripts/steward-relay.test.mjs
+node scripts/phase7-live-relay-demo.mjs
+```
+
+The demo creates its bearer token internally and never prints it. It uses the proof
+service for contract setup and the wallet's separate DUST proof, never for Slip's native
+`sealPick` proof. Set `SLIP_PROVE_CLI` only when the native CLI is not at the documented
+default path. This host component test is not a substitute for the pending authenticated
+physical-device run.
 
 ## Design and documentation
 

@@ -9,7 +9,12 @@ iPhone (SwiftUI app)
  │    ├─ witness store   {choice, salt} — encrypted, device-only
  │    ├─ prover          Compact circuits proved ON DEVICE (no proof server)
  │    └─ params/keys     fetched on demand + cached (k≈10 needs ~200KB BLS params)
- └─ chain client ── submits {commitment, proof}; reads contract state via indexer
+ └─ network prototype ── fetches public context; hands a proved/pre-binding seal
+                         to an authenticated trusted developer relay
+
+Trusted local steward relay
+ ├─ strict sealPick-only policy ── adds DUST, signs and finalizes
+ └─ chain/indexer ── submits the finalized transaction; confirms public state
 
 Midnight network (dev: `undeployed` local trio)
  └─ slip.compact — ONE contract: rounds, commitments, deadline, reveals, scores
@@ -247,11 +252,49 @@ only) but become load-bearing the moment stakes exist:
 
 ## Disclosure ledger
 
+### Experimental native seal relay (September 2026)
+
+The optional undeployed-network path separates private execution/proving on the phone
+from fee payment by a trusted local steward. `NetworkSealingService` receives from the
+relay only the configured contract address plus a tagged public `ContractState` and its block time,
+then executes `sealPick`, derives the ledger binding while assembling the call, and
+proves it in process. The `{choice, salt}`, device secret, private runtime transcript
+and `proofData` never cross that boundary. A planted 32-byte control verifies that the
+device-secret pattern is absent from the 5,238-byte handoff.
+
+What crosses from the app boundary is the proved/pre-binding `sealPick` transaction:
+the zero-knowledge proof, public call transcript/commitment and ledger binding material
+needed by the wallet. This is sensitive wallet-handoff data even though it contains no
+witness. The authenticated developer relay deserializes it, admits exactly one
+guaranteed effect-free `sealPick` call to one configured contract, adds only DUST,
+signs/finalizes with the undeployed genesis wallet and submits the finalized
+transaction to the node. Its confirmation endpoint reads only current public contract
+state through the indexer. The relay never receives the private runtime `proofData`,
+and neither request bodies, proof bytes, tokens, keys nor internal errors are logged or
+echoed.
+
+Every work endpoint requires a fresh 32-byte bearer token. The server binds loopback by
+default; non-loopback binding needs an explicit opt-in and plain HTTP is limited to a
+trusted local LAN/Tailscale developer demo—never public Wi-Fi, port forwarding or
+production. The relay is a trusted wallet boundary, not trustless DUST sponsorship.
+Only the finalized transaction crosses from that boundary to the node. The host
+tooling proof service may prove setup calls and the steward wallet's separate DUST
+transaction; it never proves Slip's native `sealPick` call.
+
+Evidence remains deliberately split. A physical iPhone component test assembled and
+proved against embedded post-create state, but used a stub relay with no HTTP, wallet,
+node or indexer. Separately, `scripts/phase7-live-relay-demo.mjs` exercised the real
+authenticated HTTP steward against the undeployed node and required `SucceedEntirely`
+plus exact indexed commitment equality, but its producer was the host. The current
+Swift HTTP client still needs the required bearer-token wiring before one run can prove
+the combined physical-iPhone → relay → devnet path. Sources and limits:
+`docs/phase6-sources.md` and `docs/phase7-sources.md`.
+
 ### App-only local proving demonstration (September 2026)
 
-The SwiftUI build does not implement the target chain client or encrypted witness
-store shown above. Each new local draft gets an immutable UUID, question, ordered
-side labels, crew name, creation time and sealing deadline. A domain-separated,
+The default SwiftUI local demonstration does not invoke the experimental chain path
+described above or an encrypted witness store. Each new local draft gets an immutable
+UUID, question, ordered side labels, crew name, creation time and sealing deadline. A domain-separated,
 length-prefixed canonical encoding of that public metadata is SHA-256 hashed and
 passed as `createSlip`'s question commitment in an in-memory `ContractRuntime`.
 No contract address or crew state is fetched from a network.
@@ -269,8 +312,9 @@ The presentation model owns its task. Departing the active flow or inactivating
 the scene invalidates late UI completion; native proving may finish and be cached by the actor, but
 cannot navigate a departed screen. This is session-only: terminating the app loses
 the witness, so that session cannot be revealed after relaunch. Preview rosters and results are
-synthetic. Wallet, submission, indexer, persistent storage and verified network
-reveal remain separate, owner-scoped work.
+synthetic. In this mode the steward wallet, submission and indexer are not invoked;
+the experimental seal-only boundary above is separate. Persistent witness storage and
+verified network reveal remain unimplemented.
 
 The same actor now proves all six steps: enroll → create → seal → reveal → settle
 → optional dispute. It retains the original device secret, choice, steward secret
