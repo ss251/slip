@@ -48,3 +48,5 @@ int32_t  slip_build_proved_call_tx(const char *proofdata_json, const char *netwo
                                    uint64_t block_secs, uint64_t ttl_secs,
                                    const char *zkir_dir, const char *keys_dir, const char *params_dir,
                                    uint8_t **out_tx, size_t *out_tx_len);
+/* Call once before proving: rayon workers adopt USER_INITIATED QoS (fixes the priority inversion). 0 = ours, 1 = pool pre-existed. */
+int32_t  slip_init_thread_pool(void);

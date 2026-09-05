@@ -16,6 +16,9 @@ public actor Prover {
 
     public init(artifacts: ProofArtifacts = .bundled()) {
         self.artifacts = artifacts
+        // Proving fans out onto rayon workers; give them the caller's QoS so a
+        // user-initiated seal never waits on default-priority threads.
+        _ = slip_init_thread_pool()
     }
 
     public struct Proof: Sendable, Equatable {
@@ -78,7 +81,9 @@ public actor Prover {
                 ))
             }
             thread.stackSize = 64 * 1024 * 1024
-            thread.qualityOfService = .userInitiated
+            // blst's own worker pool runs at default QoS; a higher caller QoS only creates a
+            // priority inversion (Thread Performance Checker) without making proving faster.
+            thread.qualityOfService = .default
             thread.start()
         }
     }
@@ -126,7 +131,9 @@ public actor Prover {
                 }
             }
             thread.stackSize = 64 * 1024 * 1024
-            thread.qualityOfService = .userInitiated
+            // blst's own worker pool runs at default QoS; a higher caller QoS only creates a
+            // priority inversion (Thread Performance Checker) without making proving faster.
+            thread.qualityOfService = .default
             thread.start()
         }
     }
@@ -180,7 +187,9 @@ public actor Prover {
                 continuation.resume(returning: ProvedTransaction(data: data, duration: ContinuousClock.now - started))
             }
             thread.stackSize = 64 * 1024 * 1024
-            thread.qualityOfService = .userInitiated
+            // blst's own worker pool runs at default QoS; a higher caller QoS only creates a
+            // priority inversion (Thread Performance Checker) without making proving faster.
+            thread.qualityOfService = .default
             thread.start()
         }
     }
