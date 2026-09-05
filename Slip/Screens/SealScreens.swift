@@ -12,12 +12,15 @@ struct SealScreen: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.slipAccessibility) private var accessibility
     @State private var hold = SealHold()
-    @State private var peek = false
+    @State private var peek = PickPeekState()
+    @State private var peekTask: Task<Void, Never>?
     @State private var accessibleHold: Task<Void, Never>?
     @State private var displayedRoundID: UUID?
     private var proving: Bool { mode == .sealing || (flow.stage == .proving && flow.activeRoundID == model.localRound.id) }
     private var failed: Bool { mode == .proofFailed || (flow.stage == .failed && flow.activeRoundID == model.localRound.id) }
     private var already: Bool { mode == .alreadySealed || model.hasLocalSeal }
+    private var canPeek: Bool { already && (model.isPreview || flow.sealedDisplay?.roundID == model.localRound.id) }
+    private var holdAccessibility: SealHoldAccessibility { SealHoldAccessibility(isPending: accessibleHold != nil) }
     private var displayedChoice: String {
         if already, let display = flow.sealedDisplay, display.roundID == model.localRound.id { return display.selectedSide }
         return model.selectedSide
@@ -62,24 +65,26 @@ struct SealScreen: View {
         .preferredColorScheme(.dark)
         .onAppear { displayedRoundID = model.localRound.id }
         .onDisappear {
-            accessibleHold?.cancel(); hold.cancel(); peek = false
+            cancelAccessibleHold(); concealPick()
             if let displayedRoundID { flow.depart(roundID: displayedRoundID) }
         }
         .onChange(of: flow.stage) { _, stage in
+            if stage != .choosing { cancelAccessibleHold() }
             guard stage == .sealed, flow.receipt?.roundID == model.localRound.id,
                   model.screen == .seal || model.screen == .sealing else { return }
             model.markLocalSeal(roundID: model.localRound.id)
             model.go(.ticket)
         }
-        .onChange(of: model.screen) { _, _ in peek = false }
+        .onChange(of: model.screen) { _, _ in cancelAccessibleHold(); concealPick() }
+        .onChange(of: model.selectedSide) { _, _ in cancelAccessibleHold() }
         .onChange(of: model.localRound.id) { oldID, newID in
             flow.depart(roundID: oldID)
             displayedRoundID = newID
-            accessibleHold?.cancel(); accessibleHold = nil; hold.cancel(); peek = false
+            cancelAccessibleHold(); concealPick()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
-                accessibleHold?.cancel(); accessibleHold = nil; hold.cancel(); peek = false
+                cancelAccessibleHold(); concealPick()
                 flow.depart(roundID: model.localRound.id)
             }
         }
@@ -88,9 +93,9 @@ struct SealScreen: View {
     private var pickCard: some View {
         VStack(spacing: SlipSpacing.medium) {
             Text("Your pick").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)
-            Text(already && !peek ? "•••" : displayedChoice)
+            Text(already && !peek.isVisible ? "•••" : displayedChoice)
                 .font(SlipFont.large).foregroundStyle(SlipColor.ink.opacity(proving ? SlipOpacity.muted : SlipOpacity.opaque))
-                .accessibilityLabel(already && !peek ? "Your pick is concealed" : "Your pick: \(displayedChoice)")
+                .accessibilityLabel(already && !peek.isVisible ? "Your pick is concealed" : "Your pick: \(displayedChoice)")
             if !already { Text("Only you can see this").font(SlipFont.footnote).foregroundStyle(SlipColor.secondary) }
             TimelineView(.animation(paused: hold.began == nil)) { context in
                 Circle().stroke(SlipColor.separator, lineWidth: SlipStroke.emphasis)
@@ -111,9 +116,14 @@ struct SealScreen: View {
         } }
         .environment(\.colorScheme, .light)
         .onLongPressGesture(minimumDuration: SlipMotion.pressDuration, pressing: { pressing in
-            if already { peek = pressing }
+            if canPeek {
+                peekTask?.cancel(); peekTask = nil
+                peek.touch(pressing: pressing)
+            }
         }, perform: {})
-        .accessibilityAction(named: "Peek at your pick") { if already { temporaryPeek() } }
+        .modifier(SealedPickAccessibilityModifier(enabled: canPeek,
+            semantics: SealedPickAccessibility(isVisible: peek.isVisible, choice: displayedChoice),
+            activate: { temporaryPeek(toggle: true) }, show: { temporaryPeek() }, conceal: concealPick))
     }
 
     private var choices: some View {
@@ -152,13 +162,19 @@ struct SealScreen: View {
                     .animation(.easeOut(duration: SlipMotion.pressDuration), value: hold.began != nil)
                     .onLongPressGesture(minimumDuration: SlipMotion.holdDuration, maximumDistance: SlipSize.minimumTap,
                         pressing: { pressing in
-                            if pressing { hold.start(at: Date.timeIntervalSinceReferenceDate) }
+                            if pressing {
+                                cancelAccessibleHold()
+                                hold.start(at: Date.timeIntervalSinceReferenceDate)
+                            }
                             else { hold.cancel() }
                         }, perform: { beginSeal() })
                     .accessibilityAddTraits(.isButton)
-                    .accessibilityLabel("Hold to seal")
-                    .accessibilityHint("Confirms your pick after 1.2 seconds. Activate again to cancel.")
+                    .accessibilityLabel(holdAccessibility.label)
+                    .accessibilityValue(holdAccessibility.value)
+                    .accessibilityHint(holdAccessibility.hint)
                     .accessibilityAction { accessibleConfirm() }
+                    .accessibilityAction(named: Text(holdAccessibility.sealActionName)) { startAccessibleHold() }
+                    .accessibilityAction(named: Text(holdAccessibility.cancelActionName)) { cancelAccessibleHold() }
                 Text("A sealed pick can’t be changed.").font(SlipFont.footnote).foregroundStyle(SlipColor.onTicket)
             }
         }.environment(\.colorScheme, .light)
@@ -172,23 +188,54 @@ struct SealScreen: View {
     }
 
     private func beginSeal() {
-        accessibleHold?.cancel(); accessibleHold = nil; hold.cancel()
+        cancelAccessibleHold()
         flow.beginSeal(round: model.localRound, choice: model.selectedSide == model.sideLabels.first ? 1 : 0)
     }
 
     private func accessibleConfirm() {
-        if accessibleHold != nil { accessibleHold?.cancel(); accessibleHold = nil; hold.cancel(); return }
+        if accessibleHold != nil { cancelAccessibleHold(); return }
+        startAccessibleHold()
+    }
+
+    private func startAccessibleHold() {
+        guard accessibleHold == nil, !already, !proving, !failed, scenePhase == .active else { return }
+        let roundID = model.localRound.id
+        let choice = model.selectedSide
         hold.start(at: Date.timeIntervalSinceReferenceDate)
         accessibleHold = Task {
             try? await Task.sleep(for: .seconds(SlipMotion.holdDuration))
             guard !Task.isCancelled else { return }
+            guard model.localRound.id == roundID, model.selectedSide == choice,
+                  scenePhase == .active, !already, !proving, !failed else {
+                cancelAccessibleHold()
+                return
+            }
             beginSeal()
         }
     }
 
-    private func temporaryPeek() {
-        peek = true
-        Task { try? await Task.sleep(for: .seconds(SlipMotion.holdDuration)); peek = false }
+    private func cancelAccessibleHold() {
+        accessibleHold?.cancel(); accessibleHold = nil
+        hold.cancel()
+    }
+
+    private func temporaryPeek(toggle: Bool = false) {
+        guard canPeek, scenePhase == .active else { return }
+        guard toggle || !peek.isVisible else { return }
+        peekTask?.cancel(); peekTask = nil
+        let expiry = toggle ? peek.activate() : peek.show()
+        guard let expiryID = expiry else { return }
+        peekTask = Task {
+            try? await Task.sleep(for: .seconds(SlipMotion.holdDuration))
+            guard !Task.isCancelled else { return }
+            peek.expire(expiryID)
+            peekTask = nil
+        }
+    }
+
+    private func concealPick() {
+        peekTask?.cancel(); peekTask = nil
+        peek.conceal()
     }
 }
 
@@ -221,7 +268,8 @@ struct TicketScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.slipAccessibility) private var accessibility
-    @State private var peek = false
+    @State private var peek = PickPeekState()
+    @State private var peekTask: Task<Void, Never>?
     @State private var stamped = false
     private var sealedDisplay: LocalSealedDisplay? {
         flow.sealedDisplay?.roundID == model.localRound.id ? flow.sealedDisplay : nil
@@ -305,8 +353,10 @@ struct TicketScreen: View {
                 }
             }
         }.background(SlipColor.ticket.ignoresSafeArea()).preferredColorScheme(.dark)
-            .onChange(of: scenePhase) { _, phase in if phase != .active { peek = false } }
-            .onDisappear { peek = false }
+            .onChange(of: scenePhase) { _, phase in if phase != .active { concealPick() } }
+            .onChange(of: model.screen) { _, _ in concealPick() }
+            .onChange(of: model.localRound.id) { _, _ in concealPick() }
+            .onDisappear { concealPick() }
             .task {
                 guard !model.isPreview, receipt != nil,
                       flow.consumeSealFeedback(roundID: model.localRound.id) else { stamped = true; return }
@@ -327,13 +377,16 @@ struct TicketScreen: View {
             }
             VStack(spacing: SlipSpacing.medium) {
                 Text("Your pick").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)
-                Text(peek ? sealedChoice : "•••").font(SlipFont.large).foregroundStyle(SlipColor.ink)
-                    .accessibilityLabel(peek ? "Your pick: \(sealedChoice)" : "Your pick is concealed")
+                Text(peek.isVisible ? sealedChoice : "•••").font(SlipFont.large).foregroundStyle(SlipColor.ink)
+                    .accessibilityLabel(peek.isVisible ? "Your pick: \(sealedChoice)" : "Your pick is concealed")
                 SealMark(size: SlipSize.sealDisc)
                     .scaleEffect(stamped || model.isPreview || reduceMotion || accessibility.reduceMotion ? SlipOpacity.opaque : SlipMotion.stampStartScale)
                     .opacity(stamped || model.isPreview || !(reduceMotion || accessibility.reduceMotion) ? SlipOpacity.opaque : SlipSpacing.zero)
                 Text("Hold to peek").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)
             }
+            .modifier(SealedPickAccessibilityModifier(enabled: true,
+                semantics: SealedPickAccessibility(isVisible: peek.isVisible, choice: sealedChoice),
+                activate: { temporaryPeek(toggle: true) }, show: { temporaryPeek() }, conceal: concealPick))
         }.padding(SlipSpacing.large)
             .frame(maxWidth: .infinity, minHeight: SlipSize.receiptCardHeight)
             .background(SlipColor.onSeal, in: RoundedRectangle(cornerRadius: SlipRadius.largeCard))
@@ -341,11 +394,29 @@ struct TicketScreen: View {
                 RoundedRectangle(cornerRadius: SlipRadius.largeCard).stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
             } }
             .environment(\.colorScheme, .light)
-            .onLongPressGesture(minimumDuration: SlipMotion.pressDuration, pressing: { peek = $0 }, perform: {})
-            .accessibilityAction(named: "Peek at your pick") {
-                peek = true
-                Task { try? await Task.sleep(for: .seconds(SlipMotion.holdDuration)); peek = false }
-            }
+            .onLongPressGesture(minimumDuration: SlipMotion.pressDuration, pressing: {
+                peekTask?.cancel(); peekTask = nil
+                peek.touch(pressing: $0)
+            }, perform: {})
+    }
+
+    private func temporaryPeek(toggle: Bool = false) {
+        guard scenePhase == .active else { return }
+        guard toggle || !peek.isVisible else { return }
+        peekTask?.cancel(); peekTask = nil
+        let expiry = toggle ? peek.activate() : peek.show()
+        guard let expiryID = expiry else { return }
+        peekTask = Task {
+            try? await Task.sleep(for: .seconds(SlipMotion.holdDuration))
+            guard !Task.isCancelled else { return }
+            peek.expire(expiryID)
+            peekTask = nil
+        }
+    }
+
+    private func concealPick() {
+        peekTask?.cancel(); peekTask = nil
+        peek.conceal()
     }
 
     private func fact(_ label: String, _ value: String, machine: Bool = false) -> some View {
