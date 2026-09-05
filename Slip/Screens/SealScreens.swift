@@ -135,10 +135,11 @@ struct SealScreen: View {
                     Text(side).font(SlipFont.headline)
                         .foregroundStyle(model.selectedSide == side ? SlipColor.ink : SlipColor.onSeal)
                         .frame(maxWidth: .infinity, minHeight: SlipSize.compactButtonHeight)
-                        .background(model.selectedSide == side ? SlipColor.onSeal : (reduceTransparency || accessibility.reduceTransparency) ? SlipColor.ambient : SlipColor.onSeal.opacity(SlipOpacity.subtle),
+                        .background(model.selectedSide == side ? SlipColor.onSeal : (reduceTransparency || accessibility.reduceTransparency) ? SlipColor.opaqueChoice : SlipColor.onSeal.opacity(SlipOpacity.subtle),
                                     in: RoundedRectangle(cornerRadius: SlipRadius.control))
                         .overlay {
-                            if contrast == .increased || accessibility.increaseContrast {
+                            if contrast == .increased || accessibility.increaseContrast
+                                || (model.selectedSide != side && (reduceTransparency || accessibility.reduceTransparency)) {
                                 RoundedRectangle(cornerRadius: SlipRadius.control)
                                     .stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
                                     .environment(\.colorScheme, .dark)

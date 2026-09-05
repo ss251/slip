@@ -15,6 +15,8 @@ enum SlipColor {
     static let sealDeep = fixed(0x8E241A)   // debossed groove on the wax-seal mark
     static let win = adaptive(light: 0x1F7A43, dark: 0x67D08F)
     static let ambient = fixed(0x5E5560)
+    // Solid alternative to the translucent choice fill; white text remains AA.
+    static let opaqueChoice = fixed(0x706774)
     static let ticket = fixed(0x232126)
     static let onSeal = fixed(0xFFFFFF)
     static let onTicket = fixed(0xF2F2F7)
