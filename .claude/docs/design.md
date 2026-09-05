@@ -7,12 +7,13 @@ Native iOS structure carrying one confident brand accent. The bar is Luma-class 
 | Token | Light | Dark | Role |
 |---|---|---|---|
 | bg | `#F7F7F6` | `#0A0A0A` | ground (grouped) |
-| card | `#FFFFFF` | `#1C1C1E` | list/card surface |
+| card | `#FFFFFF` | `#1C1C1E` | hero and grouped-card surface |
 | fill | `#EFEFED` | `#232326` | secondary buttons, chips, wells |
 | separator | `#E8E8E6` | `#2C2C2E` | hairlines (inset 16pt in rows) |
 | ink | `#17171A` | `#F2F2F7` | primary label |
 | secondary | `#66666E` | `#98989F` | secondary label (AA on all light surfaces) |
 | **seal** | `#C63A2B` | same | THE accent — means seal/commit only; white text on it |
+| sealText | `#C63A2B` | `#E45D4E` | inline Sealed text only; AA on ground and cards |
 | seal-tint | `#FAE8E5` | derive | selected-state tint (ink text on top) |
 | win | `#1F7A43` | `#67D08F` | won/verified ONLY |
 | ambient | `#5E5560` | — | seal-sheet ground (crew art washed over it; white text) |
@@ -34,8 +35,8 @@ Large 34/41·700 — Title2 22/28·700 — Title3 20/25 — Headline 17/22·600 
 
 ## Surfaces & signature moves
 
-- Feed: hero card (full-bleed art banner + floating solid-white chips + Title2) above compact rows; day-grouped headers ("Today · Wednesday").
-- Seal flow: registration-sheet grammar — ambient ground, grabber, context row, white selected card vs translucent option, floating white pill CTA, generous emptiness.
+- Feed: hero card (full-bleed art banner + floating solid-white chips) above uncarded rows; day-grouped headers ("Today / Wednesday").
+- Seal flow: registration-sheet grammar — art-washed ambient ground, grabber, context row, white selected card vs translucent option, seal-red hold action, generous emptiness.
 - Sealed ticket: dark `ticket` surface, one giant white card with a dotted-QR of the commitment + art chip, spec rows, white pill.
 - Reveal: verdict as Large title, poll-split bars (win green vs faded struck-through), "you" hero card, compact roster.
 - **Liquid Glass is chrome only** (iOS 26 `glassEffect`; pre-26 `ultraThinMaterial`): tab bar, floating pills, sheet grabbers — content cards never glass; two glass layers never stack; the seal is never glass; Reduce Transparency → solid fill.
@@ -53,7 +54,7 @@ product decision, not a tuning knob.
 
 Seal lands = stamp scale 1.15→1.0 `spring(0.4, bounce 0.2)` + heavy impact (bounce
 earned by the gesture's momentum, and 0.2 is the ceiling — above that it reads as a
-toy). Reveal flip = per-row 3D flip, 60 ms stagger capped at 5, `spring(0.5, 0)`, `.success` haptic on your row; **Reduce Motion → crossfade**. Sheets `spring(0.45, bounce 0.2)` only after drag-release (button-open = bounce 0), always interruptible. Lists/tabs/keyboard actions never animate. Never `easeIn`.
+toy). The rare opening moment (06a) uses a per-row 3D flip, 60 ms stagger capped at 5, `spring(0.5, 0)`, `.success` haptic on your row; **Reduce Motion → crossfade**. The sealed-room roster (05) appears instantly. Sheets `spring(0.45, bounce 0.2)` only after drag-release (button-open = bounce 0), always interruptible. Routine lists/tabs/keyboard actions never animate. Never `easeIn`.
 
 **Accessibility states live in the app, not the pixels.** Reduce Motion → crossfade
 (never a blanket `animation: none`, and never shorten the hold). Reduce Transparency
@@ -68,11 +69,19 @@ the token discipline load-bearing rather than optional.
 
 ## Visual reference
 
-**Canonical: `docs/design/v5/` — thirty boards** (`00-how-slip-works` …
+**Canonical: [docs/design/v6/](../../docs/design/v6/) — thirty boards** (`00-how-slip-works` …
 `11e-reveal-mismatch`: 24 routes plus three dark and three accessibility boards).
-Source: the Paper page "v5 — the sealed pick". UI work reproduces
-these — when code and PNG disagree, the PNG wins until the design file itself
-changes. The interactive flow explainer is `docs/how-slip-works.html`.
+Produced from the committed [app snapshots](../../SlipTests/Snapshots/) on
+**2026-09-05**, after the Luma pass and opening-motion restoration (`b1f2915`).
+These are reviewed app renders, losslessly compacted at 1×, not Paper exports.
+Board names match v5: plain names copy `-light.png`, `-dark` names copy `-dark.png`,
+and `-ax` names copy `-accessibility.png` (AX1, not AX5). Standard boards are
+393×852; accessibility boards are 393×1100. Approved UI changes refresh only the
+affected snapshots and their matching v6 boards.
+
+**[v5 (Paper)](../../docs/design/v5/) is superseded and kept for diffing.** The owner
+will refresh the Paper file later; it does not govern the current app reference.
+The interactive flow explainer is [docs/how-slip-works.html](../../docs/how-slip-works.html).
 
 `docs/design/*.png` (v4, eight boards) is **superseded** — kept only for diffing.
 Do not build against it.
@@ -86,20 +95,44 @@ The three ideas the boards encode, so code doesn't quietly drop them:
 1. **One object.** The pick card is a single thing in four states — chosen,
    sealing under the disc, the ticket, flipped open. "Sealed" is never a word, a
    colour, and an icon meaning three different things.
-2. **Asymmetry is the proof.** You can see your own pick; nobody else's. Hold-to-peek
-   on your own card, sealed discs for everyone else. This is why no padlock icon
+2. **Asymmetry is the proof.** You can see your own pick; nobody else's. Other rows
+   show only inline Sealed/Waiting status until their picks open. This is why no padlock icon
    appears anywhere in the app — the behaviour states the privacy model.
 3. **Open ≠ Verdict.** Picks open at the deadline (sides in ink, no green, no
    winner); the steward records the outcome later (green, points, provenance).
    These are separate screens because they are separate moments.
 
+## Luma pass (2026-09-05)
+
+- **Inline status tags:** Sealed uses an SF Symbol interpolated into the text run; Waiting is plain secondary text. No control-shaped status coins.
+- **Who → what → when:** crew identity/status, Headline question, then quiet metadata with regular SF Symbols. Accessibility sizes allow wrapping and stacked layouts.
+- **Uncarded feed:** rows sit on the ground with 64pt art tiles and spacing as the separator. The hero and grouped settings/form cards retain their surfaces.
+- **Deterministic crew palettes:** UTF-8 DJB2 selects one of ten tokenized triads, excluding seal-red and verdict-green families. The same crew key produces the same art across screens and launches.
+- **Art-washed ambient:** crew art uses blur 60, scale 1.3, wash .35, overlay .55 and shade .52. Every rendered palette clears 7:1 for `onTicket` (minimum 7.1197:1). Reduce Transparency keeps the flat ambient fallback (6.3919:1 for `onTicket`).
+
+`sealText` is a scheme-adaptive text pair: **#C63A2B light / #E45D4E dark**.
+Only the inline Sealed tag uses it; seal buttons, hold progress and the wax mark
+keep `seal`. Measured WCAG ratios for the resolved tokens:
+
+| Appearance | Page background | Card background |
+|---|---:|---:|
+| Light | 4.847474:1 | 5.196400:1 |
+| Dark | 5.632618:1 | 4.840731:1 |
+
+All clear 4.5:1. Sources: [tokens](../../Slip/DesignSystem/DesignTokens.swift),
+[status/art components](../../Slip/DesignSystem/Components/SharedViews.swift),
+[token contrast and identity tests](../../SlipTests/CrewArtTests.swift), and
+[rendered ambient/snapshot tests](../../SlipTests/ScreenSnapshotTests.swift).
+
 ## Enforcement
 
-Two gates, different targets. **`scripts/paper-gate.py`** checks the *design boards*
-against the live Paper file (palette, type scale, HIG body length, contrast, tap
-targets, one-wax-moment, board hygiene) — run it after any board change; it needs
-Paper running and reaches it over `127.0.0.1:29979` directly, so it works even when
-the Paper MCP plugin is not connected. **`scripts/design-gate.sh <src-dir>`** runs
+The v6 boards are verified against their mapped committed snapshots: matching
+names, dimensions and decoded pixels, with no transparent or missing frames.
+**`scripts/paper-gate.py`** checks Paper-authored boards against the live Paper file
+(palette, type scale, HIG body length, contrast, tap targets, one-wax-moment, board
+hygiene). Run it for Paper edits, including the owner's later refresh; it needs
+Paper running at `127.0.0.1:29979`. It does not gate copies of app-rendered v6 snapshots.
+**`scripts/design-gate.sh <src-dir>`** runs
 the mechanical subset (token discipline, raw font sizes, glass-outside-chrome, missing Reduce Motion guards, sub-44pt tappables, easeIn). Run it on every UI diff; fix causes at the token/system level — exemptions are design debt. Contrast targets: 4.5:1 (<18pt), 3:1 large — verify against the *effective* background, translucent chips get solid backing when text sits on art.
 
 
