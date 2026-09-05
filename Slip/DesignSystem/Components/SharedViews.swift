@@ -139,6 +139,7 @@ struct PillButton: View {
     var tone: PillTone = .ink
     var icon: String? = nil
     var compact = false
+    var fillsWidth = true
     var action: () -> Void
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.slipAccessibility) private var accessibility
@@ -157,8 +158,10 @@ struct PillButton: View {
                 Text(title).multilineTextAlignment(.center)
             }
             .font(SlipFont.headline).foregroundStyle(foreground)
-            .padding(.horizontal, SlipSpacing.screen).padding(.vertical, SlipSpacing.medium)
-            .frame(maxWidth: .infinity, minHeight: compact ? SlipSize.compactButtonHeight : SlipSize.buttonHeight)
+            .padding(.horizontal, fillsWidth ? SlipSpacing.screen : SlipSpacing.large)
+            .padding(.vertical, SlipSpacing.medium)
+            .frame(maxWidth: fillsWidth ? .infinity : nil,
+                   minHeight: fillsWidth ? (compact ? SlipSize.compactButtonHeight : SlipSize.buttonHeight) : SlipSize.minimumTap)
             .background(background, in: Capsule())
             .overlay { if contrast == .increased || accessibility.increaseContrast { Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis) } }
             .contentShape(Capsule())

@@ -100,7 +100,7 @@ struct HomeScreen: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: HomeMetrics.emptyCopyWidth)
 
-            PillButton(title: "New slip") {
+            PillButton(title: "New slip", fillsWidth: false) {
                 model.go(.newSlip)
             }
 
