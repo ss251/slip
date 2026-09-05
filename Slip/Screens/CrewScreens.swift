@@ -17,8 +17,7 @@ struct CrewsScreen: View {
                     }
                 }
 
-                SlipCard(padding: SlipSpacing.zero) {
-                    VStack(spacing: SlipSpacing.zero) {
+                VStack(spacing: SlipSpacing.standard) {
                         CrewSummaryRow(
                             name: "Saturday crew",
                             people: "5 people",
@@ -29,7 +28,6 @@ struct CrewsScreen: View {
                         ) {
                             model.go(.crewDetail)
                         }
-                        InsetDivider(inset: CrewMetrics.summaryDividerInset)
                         CrewSummaryRow(
                             name: "Office pool",
                             people: "9 people",
@@ -40,7 +38,6 @@ struct CrewsScreen: View {
                         ) {
                             model.inform("Only the Saturday crew is wired into this local preview.")
                         }
-                        InsetDivider(inset: CrewMetrics.summaryDividerInset)
                         CrewSummaryRow(
                             name: "Book club",
                             people: "4 people",
@@ -52,7 +49,6 @@ struct CrewsScreen: View {
                             model.inform("Only the Saturday crew is wired into this local preview.")
                         }
                     }
-                }
 
                 Button {
                     model.go(.invite)
@@ -120,7 +116,6 @@ private struct CrewSummaryRow: View {
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, SlipSpacing.standard)
             .padding(.vertical, SlipSpacing.medium)
             .frame(minHeight: CrewMetrics.summaryRowHeight)
             .contentShape(Rectangle())

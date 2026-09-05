@@ -27,8 +27,8 @@ struct CrewArt: View {
     var body: some View {
         ArtField(palette: palette)
             .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: size / SlipArt.cornerDivisor))
-            .overlay(RoundedRectangle(cornerRadius: size / SlipArt.cornerDivisor)
+            .clipShape(RoundedRectangle(cornerRadius: size == SlipSize.art ? SlipRadius.crest : size / SlipArt.cornerDivisor))
+            .overlay(RoundedRectangle(cornerRadius: size == SlipSize.art ? SlipRadius.crest : size / SlipArt.cornerDivisor)
                 .stroke(SlipColor.secondary.opacity(SlipOpacity.subtle), lineWidth: SlipStroke.hairline))
             .accessibilityHidden(true)
     }

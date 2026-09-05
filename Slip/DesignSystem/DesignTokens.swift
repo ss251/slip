@@ -93,7 +93,7 @@ enum SlipSize {
     static let artIdentity: CGFloat = 14
     static let questionLines = 2
     static let artSmall: CGFloat = 44
-    static let art: CGFloat = 56
+    static let art: CGFloat = 64
     static let artLarge: CGFloat = 72
     static let artHero: CGFloat = 112
     static let sealMark: CGFloat = 28

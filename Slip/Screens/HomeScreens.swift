@@ -57,7 +57,7 @@ struct HomeScreen: View {
                 model.go(.seal)
             }
 
-            VStack(alignment: .leading, spacing: SlipSpacing.medium) {
+            VStack(alignment: .leading, spacing: SlipSpacing.standard) {
                 HomeDayHeading(day: "Today", state: "Wednesday")
                 HomeCompactSlipRow(
                     question: "Does the demo survive the all-hands?",
@@ -71,7 +71,7 @@ struct HomeScreen: View {
             }
         }
 
-        VStack(alignment: .leading, spacing: SlipSpacing.medium) {
+        VStack(alignment: .leading, spacing: SlipSpacing.standard) {
             HomeDayHeading(day: "Tuesday", state: "Settled")
             HomeCompactSlipRow(
                 question: "Will Raj actually ship this week?",
@@ -218,14 +218,11 @@ private struct HomeDayHeading: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.small))
-            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SlipSpacing.small))
-        layout {
-            Text(day).font(SlipFont.title2).foregroundStyle(SlipColor.ink)
-            Text(state).font(SlipFont.title3).foregroundStyle(SlipColor.secondary)
-        }
-        .accessibilityElement(children: .combine)
+        Text("\(Text(day).font(SlipFont.headline).foregroundStyle(SlipColor.ink))\(Text(" / " + state).font(SlipFont.body).foregroundStyle(SlipColor.secondary))")
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
     }
+
 }
 
 private enum HomeRowState {
@@ -244,7 +241,7 @@ private struct HomeCompactSlipRow: View {
 
     var body: some View {
         Button(action: action) {
-            SlipCard {
+            Group {
                 let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.medium))
                     : AnyLayout(HStackLayout(spacing: SlipSpacing.medium))
                 layout {
@@ -258,11 +255,11 @@ private struct HomeCompactSlipRow: View {
                             .lineLimit(typeSize.isAccessibilitySize ? nil : SlipSize.questionLines)
                         RowMetadata(symbol: "clock", text: detail)
                     }
-                    if !typeSize.isAccessibilitySize { Spacer(minLength: SlipSpacing.small) }
-
                 }
             }
-            .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
+            .padding(.vertical, SlipSpacing.medium)
+            .frame(maxWidth: .infinity, minHeight: SlipSize.minimumTap, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(SlipPressStyle())
     }
