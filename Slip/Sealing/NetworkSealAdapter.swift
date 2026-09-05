@@ -8,6 +8,8 @@ final class NetworkSealTracker {
     private(set) var receipts: [UUID: NetworkSealReceipt] = [:]
     private(set) var confirmations: [UUID: ConfirmationStatus] = [:]
     let relayHost: String?
+    /// `memberIdOf(secret)`: the public identity the steward enrols. Public by construction.
+    var memberIDHex: String?
 
     init(relayHost: String? = nil) { self.relayHost = relayHost }
     func record(_ receipt: NetworkSealReceipt, for roundID: UUID) { receipts[roundID] = receipt }
@@ -53,6 +55,7 @@ enum NetworkSealAdapter {
             prover: Prover(artifacts: LocalSealingService.bundledArtifacts()),
             contractAddressHex: setup.contractAddressHex,
             deviceSecret: secret)
+        Task { @MainActor in tracker.memberIDHex = try? await service.memberIDHex() }
         return SealFlowModel(sealOperation: operation(service: service, tracker: tracker))
     }
 }

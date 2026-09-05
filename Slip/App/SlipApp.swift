@@ -59,6 +59,7 @@ struct SlipApp: App {
                                               executeDuration: .milliseconds(9), assembleDuration: .milliseconds(1641), transactionBytes: 5238),
                            for: appModel.localRound.id)
             tracker.record(.confirmed, for: appModel.localRound.id)
+            tracker.memberIDHex = String(repeating: "9d2c", count: 16)
         }
         _networkTracker = State(initialValue: tracker)
         _flow = State(initialValue: selectedFixture?.makeFlow(round: appModel.localRound) ?? NetworkSealAdapter.makeFlow(setup: setup, tracker: tracker))

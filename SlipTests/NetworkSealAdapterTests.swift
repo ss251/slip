@@ -34,4 +34,15 @@ struct NetworkSealAdapterTests {
         #expect(NetworkSetup.fromLaunchArguments(["--relay", "http://192.168.1.10:8787", "--contract", String(repeating: "ab", count: 32)])?.contractAddressHex == String(repeating: "ab", count: 32))
         #expect(NetworkSetup.fromLaunchArguments(["--relay", "http://x", "--contract", "zz"]) == nil)
     }
+
+    @Test("makeFlow with a setup computes the public member id from a memory-backed secret")
+    @MainActor
+    func populatesMemberID() async throws {
+        let tracker = NetworkSealTracker(relayHost: "relay.test")
+        let setup = NetworkSetup(relayURL: URL(string: "http://relay.test")!, contractAddressHex: String(repeating: "11", count: 32))
+        _ = NetworkSealAdapter.makeFlow(setup: setup, tracker: tracker, secretStore: MemorySecretStore(Data(repeating: 2, count: 32)))
+        for _ in 0..<100 where tracker.memberIDHex == nil { try await Task.sleep(for: .milliseconds(20)) }
+        let id = try #require(tracker.memberIDHex)
+        #expect(Data(hex: id)?.count == 32)
+    }
 }

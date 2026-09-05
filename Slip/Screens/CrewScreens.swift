@@ -1,3 +1,4 @@
+import MidnightKit
 import SwiftUI
 
 struct CrewsScreen: View {
@@ -302,6 +303,7 @@ struct CrewDetailScreen: View {
 }
 
 struct YouScreen: View {
+    @Environment(NetworkSealTracker.self) private var networkTracker: NetworkSealTracker?
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -442,6 +444,19 @@ struct YouScreen: View {
                 ProfileSettingRow(title: "Your receipts", detail: "Every proof this iPhone made") {
                     model.inform("Receipt history is local-only and will appear after you seal a pick.")
                 }
+                InsetDivider(inset: SlipSpacing.standard)
+                ProfileSettingRow(title: "Steward relay", detail: networkTracker?.relayHost ?? "Not connected") {
+                    model.inform(networkTracker?.relayHost == nil ? "Launch with --relay and --contract, or ask your steward for a setup link." : "Sealed picks are handed to this steward, who pays the fee and posts them.")
+                }
+                InsetDivider(inset: SlipSpacing.standard)
+                ProfileSettingRow(title: "Your member id", detail: networkTracker?.memberIDHex.map { "\($0.prefix(6))…\($0.suffix(4))" } ?? "Made when you connect", machine: networkTracker?.memberIDHex != nil) {
+                    if let id = networkTracker?.memberIDHex {
+                        UIPasteboard.general.string = id
+                        model.inform("Copied. Send it to your steward to be enrolled — it reveals nothing about your picks.")
+                    } else {
+                        model.inform("Your member id appears once a steward relay is set up.")
+                    }
+                }
             }
         }
     }
@@ -537,6 +552,7 @@ private struct ProfileHistoryRow: View {
 private struct ProfileSettingRow: View {
     let title: String
     let detail: String
+    var machine: Bool = false
     let action: () -> Void
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -547,7 +563,7 @@ private struct ProfileSettingRow: View {
                     VStack(alignment: .leading, spacing: SlipSpacing.small) {
                         Text(title).font(SlipFont.body).foregroundStyle(SlipColor.ink)
                         HStack(spacing: SlipSpacing.small) {
-                            Text(detail).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                            Text(detail).font(machine ? SlipFont.machine : SlipFont.footnote).foregroundStyle(SlipColor.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: SlipSpacing.small)
                             Image(systemName: "chevron.right")
@@ -559,7 +575,7 @@ private struct ProfileSettingRow: View {
                     HStack(spacing: SlipSpacing.medium) {
                         Text(title).font(SlipFont.body).foregroundStyle(SlipColor.ink)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(detail).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                        Text(detail).font(machine ? SlipFont.machine : SlipFont.footnote).foregroundStyle(SlipColor.secondary)
                             .multilineTextAlignment(.trailing)
                             .fixedSize(horizontal: true, vertical: false)
                         Image(systemName: "chevron.right")
