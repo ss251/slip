@@ -11,6 +11,7 @@ struct SlipApp: App {
     private let increaseContrast: Bool
     #if DEBUG
     private let localFixture: LocalRoundPreviewFixture?
+    private let exportPublicProof: Bool
     #endif
 
     init() {
@@ -49,6 +50,7 @@ struct SlipApp: App {
         transparency = arguments.contains("--reduce-transparency")
         contrast = arguments.contains("--contrast")
         localFixture = selectedFixture
+        exportPublicProof = arguments.contains("--export-public-proof")
         _flow = State(initialValue: selectedFixture?.makeFlow(round: appModel.localRound) ?? SealFlowModel())
         #else
         _flow = State(initialValue: SealFlowModel())
@@ -67,6 +69,7 @@ struct SlipApp: App {
                 .preferredColorScheme(model.screen.usesDarkCanvas ? .dark : appearance)
                 #if DEBUG
                 .modifier(DebugLocalFixtureLaunch(fixture: localFixture, model: model, flow: flow))
+                .modifier(DebugPublicProofExport(enabled: exportPublicProof, model: model, flow: flow))
                 #endif
                 .modifier(DebugAccessibility(typeSize: typeSize, reduceMotion: reduceMotion,
                                              reduceTransparency: reduceTransparency, increaseContrast: increaseContrast))
