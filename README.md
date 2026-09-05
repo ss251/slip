@@ -101,11 +101,11 @@ substitute for an authenticated physical-device run.
 
 ## Design and documentation
 
-The [30 canonical v6 boards](docs/design/v6/) are losslessly compacted copies of the reviewed app snapshots, produced on 2026-09-05 after the Luma pass. They cover 24 routes plus three dark and three AX1 boards; v5 Paper boards are historical. Snapshot tests use serialized key-window rendering, 1× standard-range PNGs, light/dark, XL, AX1 and AX5. The 120 references total **11,206,142 bytes** after pixel-identical lossless compression; the comparison threshold remains **0.012**. Re-recording is explicit; see [testing](.claude/docs/testing.md).
+The [30 canonical v6 boards](docs/design/v6/) are losslessly compacted copies of the reviewed app snapshots, produced on 2026-09-05 after the Luma pass. They cover 24 routes plus three dark and three AX1 boards; v5 Paper boards are historical. Snapshot tests use serialized key-window rendering, 1× standard-range PNGs, light/dark, XL, AX1 and AX5. The 120 references total **11,191,164 bytes** after pixel-identical lossless compression; the comparison threshold remains **0.012**. Re-recording is explicit; see [testing](.claude/docs/testing.md).
 
 The [interactive explainer](docs/how-slip-works.html) distinguishes the current local build from the planned connected flow. It is an illustration, not a transaction receipt.
 
-Agents and contributors: start with [AGENTS.md](AGENTS.md), then the relevant `.claude/docs/` reference. Midnight-specific work requires kapa, Midnight Expert and MIDSKILLS, plus compiler/test verification. Commits must include their source and gate evidence. Private owner handoffs are intentionally not published.
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) for development and verification requirements, and [SECURITY.md](SECURITY.md) for the privacy invariant and private vulnerability reporting. [AGENTS.md](AGENTS.md) maps the repository and its deeper references. Midnight-specific work requires kapa, Midnight Expert and MIDSKILLS, plus compiler/test verification. Commits must include their source and gate evidence. Private owner handoffs are intentionally not published.
 
 ## License
 

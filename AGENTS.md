@@ -22,6 +22,8 @@ Slip/             SwiftUI app: App/, DesignSystem/, Models/, Screens/, Sealing/
 SlipTests/        Swift Testing suites and 120 key-window PNG references
 project.yml       XcodeGen source of truth; Slip.xcodeproj/ is generated and ignored
 scripts/          design/freshness/handoff gates, hooks, captures, app parameter staging
+SECURITY.md       privacy invariant, release blockers and private reporting
+CONTRIBUTING.md   development workflow, verification gates and contribution rules
 docs/design/v6/   30 canonical app-rendered boards; earlier versions are historical
 docs/how-slip-works.html  interactive planned connected-flow explainer
 docs/phase4-sources.md   kapa, Expert/MIDSKILLS and executable-reference evidence
