@@ -317,3 +317,48 @@ enum SlipDateText {
         return formatter.string(from: date)
     }
 }
+
+/// A pressed wax seal — Slip's mark. A scalloped rim, a soft sheen and a debossed inner
+/// ring read as physically sealed wax, never a flat disc (which, red-on-light, reads as a
+/// national flag). Seal-red stays the one accent; this only changes the SHAPE of the mark.
+struct Scallop: Shape {
+    var lobes: Int = 16
+    var amplitude: CGFloat = 0.04   // fraction of radius
+    func path(in rect: CGRect) -> Path {
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        let base = min(rect.width, rect.height) / 2 * (1 - amplitude)
+        var path = Path()
+        let steps = 240
+        for i in 0...steps {
+            let a = CGFloat(i) / CGFloat(steps) * 2 * .pi
+            let r = base * (1 + amplitude * cos(CGFloat(lobes) * a))
+            let pt = CGPoint(x: c.x + r * cos(a), y: c.y + r * sin(a))
+            if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+struct SealMark: View {
+    var size: CGFloat
+    var body: some View {
+        Scallop()
+            .fill(SlipColor.seal)
+            .overlay(
+                RadialGradient(colors: [SlipColor.onSeal.opacity(SlipOpacity.subtle), SlipColor.clear],
+                               center: .init(x: 0.36, y: 0.30), startRadius: 0, endRadius: size * 0.7)
+                    .clipShape(Scallop())
+            )
+            .overlay(   // debossed inner ring: dark groove + a light upper lip
+                Circle().inset(by: size * 0.18)
+                    .strokeBorder(SlipColor.sealDeep.opacity(SlipOpacity.strong), lineWidth: max(1, size * 0.045))
+            )
+            .overlay(
+                Circle().inset(by: size * 0.18).offset(y: -max(0.5, size * 0.012))
+                    .strokeBorder(SlipColor.onSeal.opacity(SlipOpacity.subtle), lineWidth: max(0.5, size * 0.02))
+            )
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}

@@ -316,7 +316,7 @@ struct TicketScreen: View {
                 Text("Your pick").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)
                 Text(peek ? sealedChoice : "•••").font(SlipFont.large).foregroundStyle(SlipColor.ink)
                     .accessibilityLabel(peek ? "Your pick: \(sealedChoice)" : "Your pick is concealed")
-                Circle().fill(SlipColor.seal).frame(width: SlipSize.sealDisc, height: SlipSize.sealDisc)
+                SealMark(size: SlipSize.sealDisc)
                     .scaleEffect(stamped || model.isPreview || reduceMotion || accessibility.reduceMotion ? SlipOpacity.opaque : SlipMotion.stampStartScale)
                     .opacity(stamped || model.isPreview || !(reduceMotion || accessibility.reduceMotion) ? SlipOpacity.opaque : SlipSpacing.zero)
                 Text("Hold to peek").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)

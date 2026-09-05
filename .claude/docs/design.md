@@ -101,3 +101,16 @@ targets, one-wax-moment, board hygiene) — run it after any board change; it ne
 Paper running and reaches it over `127.0.0.1:29979` directly, so it works even when
 the Paper MCP plugin is not connected. **`scripts/design-gate.sh <src-dir>`** runs
 the mechanical subset (token discipline, raw font sizes, glass-outside-chrome, missing Reduce Motion guards, sub-44pt tappables, easeIn). Run it on every UI diff; fix causes at the token/system level — exemptions are design debt. Contrast targets: 4.5:1 (<18pt), 3:1 large — verify against the *effective* background, translucent chips get solid backing when text sits on art.
+
+
+## The mark (2026-09-05)
+
+Slip's mark is a **pressed wax seal**, not a flat disc. A solid seal-red circle on a light
+ground reads as the Japanese flag (Hinomaru) — a real tone problem given AkinDo and Midnight
+are Japan-based — so the mark carries a scalloped rim, a soft sheen, and a debossed inner
+ring, and the app icon sits on the brand's near-black ground (red-on-dark, never red-on-white).
+Seal-red (`SlipColor.seal`) stays the one accent; only the SHAPE changed. Implemented as
+`SealMark` + `Scallop` in `SharedViews.swift` (used for the 56pt ticket disc; small ≤28pt
+status dots stay plain — a dot isn't a flag). Icon source: `AppIcon.appiconset/icon-source.svg`
+(wax seal on `#0A0A0A`), rasterized 1024² via `rsvg-convert`. Run through the Emil design
+doctrine (design-sauce); upstream emilkowalski/skills verified current at commit d23d7f8.

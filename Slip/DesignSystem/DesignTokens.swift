@@ -10,6 +10,7 @@ enum SlipColor {
     static let secondary = adaptive(light: 0x66666E, dark: 0x98989F)
     static let seal = fixed(0xC63A2B)
     static let sealTint = adaptive(light: 0xFAE8E5, dark: 0x3B211E)
+    static let sealDeep = fixed(0x8E241A)   // debossed groove on the wax-seal mark
     static let win = adaptive(light: 0x1F7A43, dark: 0x67D08F)
     static let ambient = fixed(0x5E5560)
     static let ticket = fixed(0x232126)
