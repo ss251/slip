@@ -43,6 +43,8 @@ Same lifecycle on the physical iPhone 15 Pro (iOS 26.6.1), one run, `LocalRoundS
 | `settle` | 34.5 ms | 13 ms | 1,046 ms | 4,480 |
 | `dispute` | 38.9 ms | 16 ms | 1,016 ms | 4,480 |
 
+Network path on the same phone (`NetworkSealingServiceTests` on device, stub relay serving the exported live contract state): `sealPick` executed against the live state in **9 ms**, transaction assembled and proved in process in **1,641 ms**, proved unbalanced transaction **5,238 bytes** — the device secret never appears in the submitted bytes. The relay balances and submits; network acceptance is established by the Phase 6 devnet referee (see `docs/phase6-sources.md`).
+
 Both tables are single-run observations (host CPU, then the phone), not latency promises or a performance budget. Preparation includes runtime initialization and replay of accepted steps; key/prove durations come from `Proof`. Reproduce the public-only `LOCAL_ROUND_PROOF` measurements with `LocalRoundServiceTests`. Local execution/proving does **not** establish network acceptance. Source decisions and version caveats: [Phase 4 sources](docs/phase4-sources.md).
 
 ## Build and test
