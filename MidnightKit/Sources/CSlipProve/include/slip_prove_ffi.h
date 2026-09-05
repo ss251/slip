@@ -29,3 +29,13 @@ int32_t  slip_prove_proof_data(const char *ir_path, const char *params_dir, cons
                                uint64_t *out_keygen_ms, uint64_t *out_prove_ms,
                                uint8_t **out_proof, size_t *out_proof_len);
 void     slip_free_bytes(uint8_t *p, size_t len);
+/* Binding-aware proving: binding_input_hex (big-endian hex, NULL = no overwrite) is set on the preimage
+   exactly as the proof server does before proving. -19 = bad binding hex. */
+int32_t  slip_prove_proof_data_bound(const char *ir_path, const char *params_dir, const char *proofdata_json,
+                                     const char *key_location, const char *pk_path, const char *binding_input_hex,
+                                     uint64_t *out_keygen_ms, uint64_t *out_prove_ms,
+                                     uint8_t **out_proof, size_t *out_proof_len);
+int32_t  slip_prove_preimage_bound(const char *ir_path, const char *params_dir, const char *preimage_path,
+                                   const char *pk_path, const char *binding_input_hex,
+                                   uint64_t *out_keygen_ms, uint64_t *out_prove_ms,
+                                   uint8_t **out_proof, size_t *out_proof_len);

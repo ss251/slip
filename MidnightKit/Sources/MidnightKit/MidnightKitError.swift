@@ -14,6 +14,8 @@ public enum MidnightKitError: Error, Equatable, Sendable {
     case runtime(String)
     /// `proofData` from the runtime did not deserialise into a proof preimage.
     case proofDataInvalid
+    /// The transaction binding input was not a valid field element (hex).
+    case bindingInputInvalid
 
     /// Maps the FFI's negative return codes. Anything unrecognised stays `proveFailed`
     /// with its raw code rather than being flattened into a generic error — a code we
@@ -27,6 +29,7 @@ public enum MidnightKitError: Error, Equatable, Sendable {
         case -16: return .provingKeyMissing(circuit: circuit)
         case -17: return .provingKeyUnreadable(circuit: circuit)
         case -18: return .proofDataInvalid
+        case -19: return .bindingInputInvalid
         default:  return .proveFailed(code: code)
         }
     }
@@ -45,6 +48,7 @@ extension MidnightKitError: CustomStringConvertible {
         case .cancelled:                   "proving was cancelled"
         case .runtime(let m):              "contract runtime error: \(m)"
         case .proofDataInvalid:            "proofData from the runtime could not be decoded into a preimage"
+        case .bindingInputInvalid:         "transaction binding input is not a valid field element"
         }
     }
 }

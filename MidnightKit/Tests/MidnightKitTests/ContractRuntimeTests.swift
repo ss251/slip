@@ -99,4 +99,19 @@ struct ContractRuntimeTests {
         #expect(proof.bytes == 4480)
         #expect(proof.data.count == proof.bytes)
     }
+
+    @Test("a proof bound to a transaction binding input differs from the unbound proof and rejects bad hex")
+    func bindingInputIsInTheStatement() async throws {
+        let rt = try ContractRuntime()
+        let json = try rt.evaluate(Self.sealPickDriver)
+        let prover = Prover(artifacts: Self.artifacts)
+        let unbound = try await prover.prove(circuit: "sealPick", proofData: json)
+        let bound = try await prover.prove(circuit: "sealPick", proofData: json, bindingInput: "0x2a")
+        print("BOUND prove: \(bound.proveDuration) unbound: \(unbound.proveDuration)")
+        #expect(bound.bytes == 4480)
+        #expect(bound.data != unbound.data, "binding input must change the proof")
+        await #expect(throws: MidnightKitError.bindingInputInvalid) {
+            _ = try await prover.prove(circuit: "sealPick", proofData: json, bindingInput: "0xzz")
+        }
+    }
 }

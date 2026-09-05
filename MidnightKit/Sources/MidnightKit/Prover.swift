@@ -34,6 +34,19 @@ public actor Prover {
     /// derived from the witness — is built in memory by the Rust side and never
     /// written anywhere. The returned `Proof.data` is the only thing that leaves.
     public func prove(circuit: String, proofData: String) async throws -> Proof {
+        try await prove(circuit: circuit, proofData: proofData, bindingInput: nil)
+    }
+
+    /// Proves `circuit` from `proofData`, binding the proof to a transaction.
+    ///
+    /// A proof placed inside a transaction must commit to that transaction's binding
+    /// input — `Transaction.prove` derives it from the call's address, entry point, gas
+    /// and the transaction's binding commitment, and the proof server overwrites the
+    /// preimage's `binding_input` with it before proving. A proof made without it is
+    /// rejected on-chain as `Malformed(InvalidProof)`. Pass the value as big-endian hex
+    /// (as midnight-js prints field elements); `nil` keeps the zero binding, which is
+    /// only valid for local demonstration, never for submission.
+    public func prove(circuit: String, proofData: String, bindingInput: String?) async throws -> Proof {
         try artifacts.validate(circuit: circuit)
         let irPath = artifacts.circuit(circuit).path
         let keyPath = artifacts.provingKey(circuit).path
@@ -45,7 +58,12 @@ public actor Prover {
                 var ptr: UnsafeMutablePointer<UInt8>? = nil
                 let rc = irPath.withCString { ir in paramsPath.withCString { params in
                     proofData.withCString { pd in circuit.withCString { key in keyPath.withCString { pk in
-                        slip_prove_proof_data(ir, params, pd, key, pk, &keygenMs, &proveMs, &ptr, &len)
+                        if let bindingInput {
+                            return bindingInput.withCString { b in
+                                slip_prove_proof_data_bound(ir, params, pd, key, pk, b, &keygenMs, &proveMs, &ptr, &len)
+                            }
+                        }
+                        return slip_prove_proof_data(ir, params, pd, key, pk, &keygenMs, &proveMs, &ptr, &len)
                     } } } } }
                 guard rc == 0, let ptr else {
                     continuation.resume(throwing: MidnightKitError.from(code: rc, circuit: circuit)); return

@@ -228,3 +228,24 @@ proving artifacts from `contracts/build/{zkir,keys,params}` (gitignored; `compac
 produces zkir+keys, `params/bls_midnight_2p14` is the k=14 SRS the proof server
 downloads — copy it there once). The resource directory is `JS/`, not `Resources/`:
 codesign rejects a SwiftPM bundle with a top-level directory of that name.
+
+## Transaction-bound proving (2026-09-05)
+
+A proof inside a transaction must commit to that transaction's binding input: ledger's
+`Transaction::prove` passes `call.binding_input(binding_commitment)` (address, entry
+point, transcript gas, and the transaction's Pedersen binding commitment — see
+`ledger/src/verify.rs`), and the proof server simply sets `preimage.binding_input` to it
+before proving (`proof-server/src/endpoints.rs`). A zero-bound proof is rejected on-chain
+as `Malformed(InvalidProof)` — exactly what the Phase 6 devnet referee saw.
+
+The native bridge now takes the overwrite: `slip_prove_proof_data_bound` (phone path)
+and `slip_prove_preimage_bound` (host path), surfaced as
+`Prover.prove(circuit:proofData:bindingInput:)` (big-endian hex field element; `nil`
+keeps the zero binding for local demos only; bad hex → `.bindingInputInvalid`). Host CLI
+`slip-prove --preimage … --binding 0x… --out …` (built with `cargo build --release
+--features cli --bin slip-prove` in slip-prove-ffi) stands in for the proof server in a
+Node `ProvingProvider`, so the devnet can verify a proof made by OUR prover. Evidence:
+two bindings → two different 4,480-byte proofs (host test `binding_changes_the_proof`;
+kit test `bindingInputIsInTheStatement`, gate 9/9). The remaining gap for a phone-only
+submission is assembling the unproven transaction on device so the binding is known
+before proving — that is the native tx-assembly work, tracked in HANDOFF.md.
