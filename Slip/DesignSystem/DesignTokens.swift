@@ -167,6 +167,8 @@ enum SlipMotion {
     static let pressDuration: TimeInterval = 0.15
     static let cancelDuration: TimeInterval = 0.2
     static let stampDuration: TimeInterval = 0.4
+    static let revealDuration: TimeInterval = 0.5
+    static let revealStagger: TimeInterval = 0.06
     static let stampStartScale: CGFloat = 1.15
     static let stampBounce: Double = 0.2
 }
