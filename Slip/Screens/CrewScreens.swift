@@ -205,30 +205,10 @@ struct CrewDetailScreen: View {
             Button {
                 model.go(.room)
             } label: {
-                SlipCard {
-                    if typeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: SlipSpacing.medium) {
-                            HStack {
-                                SealStatusTag(sealed: false)
-                                Spacer(minLength: SlipSpacing.standard)
-                                Image(systemName: "chevron.right")
-                                    .font(SlipFont.footnoteBold)
-                                    .foregroundStyle(SlipColor.secondary)
-                            }
-                            openSlipLabels
-                        }
-                    } else {
-                        HStack(spacing: SlipSpacing.medium) {
-                            SealStatusTag(sealed: false)
-                            openSlipLabels
-                            Spacer(minLength: SlipSpacing.small)
-                            Image(systemName: "chevron.right")
-                                .font(SlipFont.footnoteBold)
-                                .foregroundStyle(SlipColor.secondary)
-                        }
-                    }
-                }
-                .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
+                openSlipLabels
+                    .padding(.vertical, SlipSpacing.medium)
+                    .frame(maxWidth: .infinity, minHeight: SlipSize.minimumTap, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(SlipPressStyle())
         }
@@ -236,14 +216,16 @@ struct CrewDetailScreen: View {
 
     private var openSlipLabels: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+            CrewIdentityLine(crew: PreviewContent.crew) {
+                SealStatusTag(sealed: false)
+            }
             Text(model.sampleQuestion)
                 .font(SlipFont.headline)
                 .foregroundStyle(SlipColor.ink)
+                .lineLimit(typeSize.isAccessibilitySize ? nil : SlipSize.questionLines)
                 .multilineTextAlignment(.leading)
-            Text("Seal by Fri 20:00 · 3 of 5 sealed")
-                .font(SlipFont.subheadline)
-                .foregroundStyle(SlipColor.secondary)
-                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            RowMetadata(symbol: "clock", text: "Seal by Fri 20:00 · 3 of 5 sealed")
         }
     }
 
