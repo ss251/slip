@@ -69,6 +69,7 @@ struct SealedRoomScreen: View {
 
                     VStack(spacing: SlipSpacing.medium) {
                         Text(displayedQuestion)
+                            .accessibilityAddTraits(.isHeader)
                             .font(SlipFont.title2)
                             .foregroundStyle(SlipColor.ink)
                             .multilineTextAlignment(.center)
@@ -242,6 +243,7 @@ struct OpeningScreen: View {
                 .font(SlipFont.footnoteBold)
                 .foregroundStyle(SlipColor.secondary)
             Text(PreviewContent.question)
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.title2)
                 .foregroundStyle(SlipColor.ink)
         }
@@ -339,6 +341,7 @@ struct OpeningScreen: View {
         SlipCard {
             VStack(alignment: .leading, spacing: SlipSpacing.small) {
                 Text("About Raj’s pick").font(SlipFont.headline)
+                    .accessibilityAddTraits(.isHeader)
                 Text("A pick only counts if what’s opened is exactly what was sealed. Raj’s wasn’t, so his pick sits this round out. Nobody else is affected, and nothing about anyone’s pick was ever visible early.")
                     .font(SlipFont.body)
                     .foregroundStyle(SlipColor.secondary)
@@ -659,6 +662,7 @@ struct SettleScreen: View {
                 if !model.isPreview { FixtureDisclosure() }
                 ContextRow(detail: "5 of 5 opened · your call")
                 Text("What happened?")
+                    .accessibilityAddTraits(.isHeader)
                     .font(SlipFont.large)
                     .foregroundStyle(SlipColor.ink)
 
@@ -722,6 +726,7 @@ struct ChallengeScreen: View {
 
                 VStack(alignment: .leading, spacing: SlipSpacing.medium) {
                     Text("Challenge Ana’s call?")
+                        .accessibilityAddTraits(.isHeader)
                         .font(SlipFont.large)
                         .foregroundStyle(SlipColor.ink)
                     Text("Ana called it: it rained. If you challenge, the round is voided for everyone. Nobody scores.")
@@ -970,6 +975,7 @@ private struct LocalResultScreen: View {
     @ViewBuilder private func localContent(_ result: LocalRoundResult) -> some View {
         if destination != .room {
             Text(result.round.question)
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.title2)
                 .foregroundStyle(SlipColor.ink)
         }
@@ -1180,6 +1186,7 @@ private struct LocalResultScreen: View {
         SlipCard {
             VStack(alignment: .leading, spacing: SlipSpacing.small) {
                 Text(title).font(SlipFont.headline).foregroundStyle(SlipColor.ink)
+                    .accessibilityAddTraits(.isHeader)
                 Text(detail).font(SlipFont.body).foregroundStyle(SlipColor.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1281,6 +1288,7 @@ private struct LocalProofTimings: View {
         SlipCard {
             VStack(alignment: .leading, spacing: SlipSpacing.standard) {
                 Text("Proved on this device").font(SlipFont.headline).foregroundStyle(SlipColor.ink)
+                    .accessibilityAddTraits(.isHeader)
                 ForEach(steps.indices, id: \.self) { index in
                     let receipt = steps[index]
                     VStack(alignment: .leading, spacing: SlipSpacing.small) {

@@ -29,6 +29,7 @@ struct HomeScreen: View {
     private var header: some View {
         HStack(alignment: .center, spacing: SlipSpacing.medium) {
             Text("Slips")
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.large)
                 .foregroundStyle(SlipColor.ink)
             Spacer(minLength: SlipSpacing.standard)
@@ -91,6 +92,7 @@ struct HomeScreen: View {
                 .padding(.bottom, SlipSpacing.large)
 
             Text("No slips yet")
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.title2)
                 .foregroundStyle(SlipColor.ink)
 
@@ -215,6 +217,7 @@ private struct HomeHeroCard: View {
                     status: "Ana, Raj and 1 more sealed",
                     metadata: "Seal by Fri 20:00"
                 ))
+                .accessibilityAddTraits(.isHeader)
                 Button("Seal your pick", action: action)
             }
         }
@@ -230,6 +233,7 @@ private struct HomeDayHeading: View {
         Text("\(Text(day).font(SlipFont.headline).foregroundStyle(SlipColor.ink))\(Text(" / " + state).font(SlipFont.body).foregroundStyle(SlipColor.secondary))")
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
     }
 
 }
@@ -350,6 +354,7 @@ struct HowItWorksScreen: View {
 
                 VStack(alignment: .leading, spacing: SlipSpacing.small) {
                     Text("How Slip works")
+                        .accessibilityAddTraits(.isHeader)
                         .font(SlipFont.large)
                         .foregroundStyle(SlipColor.ink)
                     Text("One question, a few friends, zero peeking.")
@@ -411,6 +416,8 @@ private struct HowStepCard: View {
             .frame(maxWidth: .infinity, minHeight: HomeMetrics.stepCardHeight, alignment: .topLeading)
         }
         .frame(maxWidth: fillWidth ? .infinity : HomeMetrics.stepCardWidth)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(step.accessibilityLabel)
     }
 }
 
@@ -439,17 +446,19 @@ private struct HowStepMark: View {
     }
 }
 
-private enum HowStepMarkKind: Sendable {
+enum HowStepMarkKind: Sendable {
     case pick, seal, roster, open, score
 }
 
-private struct HowStepContent: Identifiable, Sendable {
+struct HowStepContent: Identifiable, Sendable {
     let number: String
     let mark: HowStepMarkKind
     let title: String
     let body: String
 
     var id: String { number }
+    // Narration follows the step, not the decorative mark or the card's geometry.
+    var accessibilityLabel: String { "Step \(number). \(title). \(body)" }
 
     static let rosterStates = [true, true, true, false, false]
     static let steps = [

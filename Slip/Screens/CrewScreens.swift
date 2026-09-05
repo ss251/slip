@@ -9,6 +9,7 @@ struct CrewsScreen: View {
             VStack(alignment: .leading, spacing: SlipSpacing.large) {
                 HStack {
                     Text("Crews")
+                        .accessibilityAddTraits(.isHeader)
                         .font(SlipFont.large)
                         .foregroundStyle(SlipColor.ink)
                     Spacer(minLength: SlipSpacing.standard)
@@ -174,6 +175,7 @@ struct CrewDetailScreen: View {
             CrewArt(size: SlipSize.artLarge)
                 .padding(.bottom, SlipSpacing.medium)
             Text("Saturday crew")
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.title2)
                 .foregroundStyle(SlipColor.ink)
             Text("5 people · 6 slips · since June")
@@ -199,6 +201,7 @@ struct CrewDetailScreen: View {
     private var openSlip: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.medium) {
             Text("Open")
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.subheadlineBold)
                 .foregroundStyle(SlipColor.secondary)
 
@@ -238,6 +241,7 @@ struct CrewDetailScreen: View {
     private var members: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.medium) {
             Text("Members")
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.subheadlineBold)
                 .foregroundStyle(SlipColor.secondary)
 
@@ -294,6 +298,7 @@ struct YouScreen: View {
     private var profileHeader: some View {
         HStack {
             Text("You")
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.large)
                 .foregroundStyle(SlipColor.ink)
             Spacer(minLength: SlipSpacing.standard)
@@ -360,6 +365,7 @@ struct YouScreen: View {
     private var history: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.medium) {
             Text("Sealed history")
+                .accessibilityAddTraits(.isHeader)
                 .font(SlipFont.subheadlineBold)
                 .foregroundStyle(SlipColor.secondary)
 

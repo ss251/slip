@@ -259,6 +259,7 @@ private struct CreationDateEditor: View {
         VStack(spacing: SlipSpacing.large) {
             HStack {
                 Text(field.rawValue)
+                    .accessibilityAddTraits(.isHeader)
                     .font(SlipFont.title2)
                     .foregroundStyle(SlipColor.ink)
                 Spacer(minLength: SlipSpacing.standard)
@@ -301,6 +302,7 @@ struct InviteScreen: View {
                             .font(SlipFont.body)
                             .foregroundStyle(SlipColor.secondary)
                         Text("Saturday crew")
+                            .accessibilityAddTraits(.isHeader)
                             .font(SlipFont.large)
                             .foregroundStyle(SlipColor.ink)
                     }
@@ -316,6 +318,7 @@ struct InviteScreen: View {
 
                     VStack(alignment: .leading, spacing: SlipSpacing.medium) {
                         Text("Waiting for you")
+                            .accessibilityAddTraits(.isHeader)
                             .font(SlipFont.subheadlineBold)
                             .foregroundStyle(SlipColor.secondary)
 

@@ -187,10 +187,13 @@ struct RoundButton: View {
 struct ScreenHeader: View {
     let title: String
     var subtitle: String? = nil
+    var headingAccessibility: HeadingAccessibility { HeadingAccessibility(label: title) }
     var body: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.small) {
             if let subtitle { Text(subtitle).font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary) }
             Text(title).font(SlipFont.large).foregroundStyle(SlipColor.ink)
+                .accessibilityLabel(headingAccessibility.label)
+                .accessibilityAddTraits(headingAccessibility.traits)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -199,6 +202,7 @@ struct SheetHeading: View {
     let title: String
     var light = false
     var sealIndicator = false
+    var headingAccessibility: HeadingAccessibility { HeadingAccessibility(label: title) }
     @Environment(AppModel.self) private var model
     var body: some View {
         VStack(spacing: SlipSpacing.medium) {
@@ -207,6 +211,8 @@ struct SheetHeading: View {
             HStack(spacing: SlipSpacing.small) {
                 if sealIndicator { Circle().fill(SlipColor.seal).frame(width: SlipSize.sealDot, height: SlipSize.sealDot).accessibilityHidden(true) }
                 Text(title).font(SlipFont.headline).foregroundStyle(light ? SlipColor.onSeal : SlipColor.ink)
+                    .accessibilityLabel(headingAccessibility.label)
+                    .accessibilityAddTraits(headingAccessibility.traits)
             }
         }.frame(maxWidth: .infinity).padding(.top, SlipSpacing.small)
             .contentShape(Rectangle())
@@ -221,6 +227,7 @@ struct SheetHeading: View {
 struct FormHeading: View {
     let title: String
     var cancel: () -> Void
+    var headingAccessibility: HeadingAccessibility { HeadingAccessibility(label: title) }
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
@@ -242,6 +249,8 @@ struct FormHeading: View {
     private var heading: some View {
         Text(title).font(SlipFont.headline).foregroundStyle(SlipColor.ink)
             .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(headingAccessibility.label)
+            .accessibilityAddTraits(headingAccessibility.traits)
     }
 
     private var cancelButton: some View {
