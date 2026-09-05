@@ -439,9 +439,7 @@ struct VerdictScreen: View {
     private var winnerCopy: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.micro) {
             Text("You called it").font(SlipFont.headline)
-            Text("Sealed Yes on Tuesday")
-                .font(SlipFont.footnote)
-                .foregroundStyle(SlipColor.secondary)
+            RowMetadata(symbol: "clock", text: "Sealed Yes on Tuesday")
         }
     }
 
@@ -470,14 +468,14 @@ struct VerdictScreen: View {
 
     private var provenance: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: SlipSpacing.tiny) {
-                Text("Called by Ana, Saturday 18:04 ·")
-                    .foregroundStyle(SlipColor.secondary)
+            HStack(spacing: SlipSpacing.small) {
+                RowMetadata(symbol: "person", text: "Called by Ana")
+                RowMetadata(symbol: "clock", text: "Saturday 18:04")
                 challengeButton
             }
             VStack(alignment: .leading, spacing: SlipSpacing.small) {
-                Text("Called by Ana, Saturday 18:04")
-                    .foregroundStyle(SlipColor.secondary)
+                RowMetadata(symbol: "person", text: "Called by Ana")
+                RowMetadata(symbol: "clock", text: "Saturday 18:04")
                 challengeButton
             }
         }
@@ -852,9 +850,10 @@ struct VoidedScreen: View {
     private var challengeSummaryCopy: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
             Text("Raj challenged Ana’s call").font(SlipFont.headline)
-            Text("Ana said it rained · Raj: “a drizzle is not rain” · Sunday 09:12")
+            Text("Ana said it rained · Raj: “a drizzle is not rain”")
                 .font(SlipFont.footnote)
                 .foregroundStyle(SlipColor.secondary)
+            RowMetadata(symbol: "clock", text: "Sunday 09:12")
         }
         .foregroundStyle(SlipColor.ink)
     }
@@ -1457,7 +1456,9 @@ private struct ResultRosterRow: View {
 
     var body: some View {
         Group {
-            if dynamicTypeSize.isAccessibilitySize {
+            if let sealed = item.sealed, let detail = item.detail {
+                detailedSeal(sealed: sealed, detail: detail)
+            } else if dynamicTypeSize.isAccessibilitySize {
                 HStack(alignment: .top, spacing: SlipSpacing.medium) {
                     InitialAvatar(name: item.name, size: avatarSize)
                     VStack(alignment: .leading, spacing: SlipSpacing.small) {
@@ -1480,6 +1481,24 @@ private struct ResultRosterRow: View {
         .padding(.vertical, rowVerticalPadding)
         .frame(minHeight: rowMinimumHeight)
         .accessibilityElement(children: .combine)
+    }
+
+    private func detailedSeal(sealed: Bool, detail: String) -> some View {
+        HStack(alignment: .top, spacing: SlipSpacing.medium) {
+            InitialAvatar(name: item.name, size: avatarSize)
+            VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+                let layout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.tiny))
+                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SlipSpacing.small))
+                layout {
+                    Text(item.name).font(item.name == "You" ? SlipFont.headline : SlipFont.body)
+                    if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: SlipSpacing.tiny) }
+                    SealStatusTag(sealed: sealed)
+                }
+                RowMetadata(symbol: "clock", text: detail)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var usesCompactMetrics: Bool {
