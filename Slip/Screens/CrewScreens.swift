@@ -211,6 +211,12 @@ struct CrewDetailScreen: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(SlipPressStyle())
+            .accessibilityLabel(RowAccessibility.slip(
+                question: model.sampleQuestion,
+                crew: PreviewContent.crew,
+                status: RowAccessibility.sealStatus(sealed: false),
+                metadata: "Seal by Fri 20:00 · 3 of 5 sealed"
+            ))
         }
     }
 
@@ -440,6 +446,8 @@ private struct ProfileStat: View {
             .padding(.horizontal, SlipSpacing.standard)
             .padding(.vertical, SlipSpacing.medium)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(RowAccessibility.statistic(value: value, label: label))
     }
 }
 
@@ -479,6 +487,14 @@ private struct ProfileHistoryRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(SlipPressStyle())
+        .accessibilityLabel(RowAccessibility.slip(question: question, crew: crew, status: spokenStatus, metadata: detail))
+    }
+
+    private var spokenStatus: String {
+        switch accessory {
+        case .sealed: RowAccessibility.sealStatus(sealed: true)
+        case .score(let score): RowAccessibility.points(score)
+        }
     }
 
     private var historyLabels: some View {

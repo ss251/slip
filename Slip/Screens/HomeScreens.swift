@@ -207,6 +207,17 @@ private struct HomeHeroCard: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: SlipRadius.card))
         }
+        .accessibilityRepresentation {
+            VStack {
+                Text(RowAccessibility.slip(
+                    question: model.sampleQuestion,
+                    crew: PreviewContent.crew,
+                    status: "Ana, Raj and 1 more sealed",
+                    metadata: "Seal by Fri 20:00"
+                ))
+                Button("Seal your pick", action: action)
+            }
+        }
     }
 }
 
@@ -259,7 +270,16 @@ private struct HomeCompactSlipRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(SlipPressStyle())
+        .accessibilityLabel(RowAccessibility.slip(question: question, crew: crew, status: spokenStatus, metadata: detail))
     }
+
+    private var spokenStatus: String {
+        switch state {
+        case .sealed: RowAccessibility.sealStatus(sealed: true)
+        case .score(let score): RowAccessibility.points(score)
+        }
+    }
+
     @ViewBuilder private var rowStatus: some View {
         switch state {
         case .sealed: SealStatusTag()

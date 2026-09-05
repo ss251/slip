@@ -126,6 +126,7 @@ struct NewSlipScreen: View {
             .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(RowAccessibility.crewPicker(crew: "Saturday crew", members: ["Ana", "Raj", "Maya"]))
         .accessibilityHint("Choose a crew")
     }
 
@@ -305,12 +306,13 @@ struct InviteScreen: View {
                     }
 
                     HStack(spacing: SlipSpacing.medium) {
-                        if !typeSize.isAccessibilitySize { CreationAvatarStack() }
+                        if !typeSize.isAccessibilitySize { CreationAvatarStack().accessibilityHidden(true) }
                         Text("Ana, Raj, Maya and 1 more")
                             .font(SlipFont.subheadline)
                             .foregroundStyle(SlipColor.secondary)
                     }
-                    .accessibilityElement(children: .combine)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(RowAccessibility.invitationMembers(names: ["Ana", "Raj", "Maya"], additionalCount: 1))
 
                     VStack(alignment: .leading, spacing: SlipSpacing.medium) {
                         Text("Waiting for you")
@@ -337,6 +339,12 @@ struct InviteScreen: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(RowAccessibility.slip(
+                            question: model.sampleQuestion,
+                            crew: PreviewContent.crew,
+                            status: RowAccessibility.sealStatus(sealed: false),
+                            metadata: "Seal by Fri 20:00 · 3 of 5 sealed"
+                        ))
                     }
                     .padding(.top, SlipSpacing.large)
 

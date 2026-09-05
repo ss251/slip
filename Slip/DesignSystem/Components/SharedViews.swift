@@ -130,7 +130,7 @@ struct SealStatusTag: View {
         }
         .font(SlipFont.footnote)
         .fixedSize(horizontal: false, vertical: true)
-        .accessibilityLabel(sealed ? "Sealed" : "Waiting")
+        .accessibilityLabel(RowAccessibility.sealStatus(sealed: sealed))
     }
 }
 
@@ -265,6 +265,8 @@ struct ContextRow: View {
             RowMetadata(symbol: symbol, text: detail, foreground: light ? SlipColor.onTicket : SlipColor.secondary)
         }.foregroundStyle(light ? SlipColor.onSeal : SlipColor.ink)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(RowAccessibility.slip(question: model.sampleQuestion, crew: crewID, metadata: detail))
     }
 }
 
@@ -297,6 +299,8 @@ struct MemberRow: View {
             .padding(.horizontal, SlipSpacing.standard)
             .padding(.vertical, SlipSpacing.medium)
             .frame(minHeight: SlipSize.rosterRowHeight)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(RowAccessibility.member(name: name, detail: detail, value: value, score: score, sealed: sealed))
     }
 }
 
