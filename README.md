@@ -6,6 +6,21 @@ Slip is an iOS pre-alpha for the AkinDo Buildathon, Wave 1 (2026-09-16). By defa
 
 Built on [Midnight](https://docs.midnight.network) and [Compact](https://docs.midnight.network/compact), using the `midnightntwrk` cryptography and ledger libraries through **MidnightKit**, our Swift/Rust layer.
 
+<table>
+  <tr>
+    <td><img src="docs/design/v6/01-home.png" width="220" alt="Design preview of the Slip home feed"></td>
+    <td><img src="docs/design/v6/04-sealed-ticket.png" width="220" alt="Design preview of a sealed ticket"></td>
+    <td><img src="docs/design/v6/06b-verdict.png" width="220" alt="Design preview of a crew verdict"></td>
+  </tr>
+  <tr>
+    <td align="center">seal on your phone</td>
+    <td align="center">the proof travels, never the pick</td>
+    <td align="center">opened together, called later</td>
+  </tr>
+</table>
+
+Design previews of the intended crew flow. The sealed witness stays on device; a verified opening deliberately publishes the choice. For the current working loop and its evidence boundaries, use the [three-minute demo runbook](docs/demo.md).
+
 ## Try the local round
 
 1. Create a question with two sides and hold to seal a pick. Enrollment, creation and sealing are proved locally.
@@ -21,7 +36,7 @@ The actor retains the original device secret and pick only in memory. The circui
 
 Physical-device run (2026-09-05, iPhone 15 Pro / A17 Pro, iOS 26.6.1, this app build): the sealing and round-flow suites pass on the phone (13 tests, 2 suites) and the complete local lifecycle proves all six circuits with real, round-bound proofs (3 tests). Earlier standalone benchmark (2026-09-03, same phone): `sealPick` key load **24 ms**, prove **1,776 ms**, **4,480 bytes**, peak RSS **290 MB** — see [MidnightKit measurements](.claude/docs/midnightkit.md).
 
-Current app gate (2026-09-05, iPhone 17 Pro simulator / iOS 27): **40 tests passed**, including six real-circuit proving cases, the complete lifecycle, circuit-level mismatch rejection followed by recovery, and the network-component boundary. One complete-round run measured:
+Current app gate (2026-09-06, iPhone 17 Pro simulator / iOS 27): **45 tests passed**, including six real-circuit proving cases, the complete lifecycle, circuit-level mismatch rejection followed by recovery, and the network-component boundary. One complete-round run on 2026-09-05 measured:
 
 | Circuit | Prepare / replay | Key load | Prove | Proof bytes |
 |---|---:|---:|---:|---:|
