@@ -1,10 +1,10 @@
 # Slip — agent guide
 
-Sealed group predictions with friends. Everyone commits a hidden pick to a shared question; picks are cryptographically sealed on each person's iPhone and revealed simultaneously at a deadline. Nobody — friends, servers, or the app's authors — can peek or edit a sealed pick, and that claim is proved, not promised.
+Sealed group predictions with friends. The current app proves a single-player local round: enroll, create, seal, reveal, settle and dispute. The circuit checks that an opening matches the original commitment. Connected crews are planned; a shared deadline creates an opening window, not guaranteed simultaneous arrivals. The proof does not establish that nobody saw an unlocked phone.
 
 Built on [Midnight](https://docs.midnight.network) (a privacy blockchain whose Compact language compiles to zero-knowledge circuits) with **on-device proof generation** via MidnightKit, our Swift/Rust proving layer.
 
-**Status:** pre-alpha, building in the open (Wave 1 milestone: 2026-09-16). Expect scaffolding to land fast; this file is the map.
+**Status:** pre-alpha, private repository being prepared for public release (Wave 1 milestone: 2026-09-16). Publication remains owner-controlled; this file is the map.
 
 ## Tech stack
 
@@ -13,16 +13,21 @@ Built on [Midnight](https://docs.midnight.network) (a privacy blockchain whose C
 - **Contract** — one Compact smart contract (`contracts/slip.compact`): commit–reveal with per-round nullifiers. A compiling contract is the heartbeat of this repo; never merge with a broken compile.
 - **Local network** — Midnight `undeployed` mode for all development: node `ws://localhost:9944`, indexer `http://localhost:8088/api/v4/graphql`, proof server `http://localhost:6300` (used by tooling only — the app itself never calls one).
 
-## Repository layout (target)
+## Repository layout
 
 ```
-contracts/        slip.compact + compiled artifacts (TS types, zkir, keys)
-MidnightKit/      Swift package: prover FFI, key/params management, wallet (later)
-Slip/             SwiftUI app
-scripts/          design-gate.sh, freshness-gate.sh, install-hooks.sh (run once: wires pre-push gates)
-docs/design/      the eight target screens as PNGs — UI work matches these, pixel-close
-docs/how-slip-works.html  interactive end-to-end explainer (self-contained)
-.claude/docs/     deep references — read the relevant one before working in that area
+contracts/        slip.compact; build/ generated JS, ZKIR and keys; test/ Node referee
+MidnightKit/      Swift package: thread-confined JS runtime and native local prover
+Slip/             SwiftUI app: App/, DesignSystem/, Models/, Screens/, Sealing/
+SlipTests/        Swift Testing suites and 120 key-window PNG references
+project.yml       XcodeGen source of truth; Slip.xcodeproj/ is generated and ignored
+scripts/          design/freshness/handoff gates, hooks, captures, app parameter staging
+docs/design/v5/   30 canonical boards; earlier design versions are historical
+docs/how-slip-works.html  interactive planned connected-flow explainer
+docs/phase4-sources.md   kapa, Expert/MIDSKILLS and executable-reference evidence
+.claude/docs/     deep references; .claude/rules/ includes privacy and mandatory tooling
+.agents/skills/   vendored MIDSKILLS; read SOURCE.md LOCAL DELTA first
+handoff/          ignored live work order, state, heartbeat and owner-only requests
 ```
 
 ## Setup
@@ -38,9 +43,10 @@ docs/how-slip-works.html  interactive end-to-end explainer (self-contained)
 Canonical shapes (compile syntax confirmed against official Midnight CI and the vendored skill; CI pins the toolchain via `midnightntwrk/setup-compact-action`, version in `.github/workflows/ci.yml`):
 
 - Freshness/drift check: `sh scripts/freshness-gate.sh` (add `--no-network` for a fast local-only run)
-- Compile contract: `compact compile contracts/slip.compact build/slip` (sanity: `compact compile --version`; add `--skip-zk` while iterating)
+- Compile contract: `compact compile contracts/slip.compact contracts/build` (sanity: `compact compile -- --version`; add `--skip-zk` while iterating; only when contract/artifact changes are authorized)
 - Contract tests: simulator-based TS tests (see `.claude/docs/testing.md`)
-- App build/tests: `xcodebuild -scheme Slip test` (snapshot tests need a booted iOS 26 simulator)
+- App preparation: `sh scripts/prepare-app-params.sh /path/to/existing/params` stages checksum-verified k13/k14 public files without network; then `xcodegen generate`.
+- App build/tests: `xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test` (serialized key-window snapshots; currently verified with iOS 27, not proof of older-runtime support)
 - Design gate (run on any UI diff): `scripts/design-gate.sh Slip/`
 
 ## Hard constraints — do not design around these, design *with* them
