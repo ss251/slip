@@ -57,4 +57,21 @@ struct StewardRelayClientTests {
         #expect(Data(hex: "abc") == nil)
         #expect(Data([0xde, 0xad]).hexString == "dead")
     }
+
+    final class TimeoutStub: URLProtocol, @unchecked Sendable {
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() { client?.urlProtocol(self, didFailWithError: URLError(.timedOut)) }
+        override func stopLoading() {}
+    }
+
+    @Test("a timed-out submit returns a pending receipt instead of throwing")
+    func submitTimesOutToPending() async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [TimeoutStub.self]
+        let relay = HTTPStewardRelay(baseURL: URL(string: "http://relay.test")!, authToken: "t", session: URLSession(configuration: config))
+        let receipt = try await relay.submit(provedTransaction: Data([1, 2, 3]))
+        #expect(receipt.pending)
+        #expect(receipt.txID.isEmpty)
+    }
 }

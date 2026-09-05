@@ -5,6 +5,8 @@ import MidnightKit
 struct NetworkSealReceipt: Sendable, Equatable {
     let commitment: Data
     let txID: String
+    /// The submit timed out; the tx may be on-chain. Resolve via confirmation().
+    let submitPending: Bool
     let executeDuration: Duration
     let assembleDuration: Duration
     let transactionBytes: Int
@@ -66,7 +68,7 @@ actor NetworkSealingService {
             contractAddressHex: context.contractAddressHex, contractState: context.contractState,
             blockTime: context.blockTime, ttl: context.blockTime + Self.ttlSeconds)
         let receipt = try await relay.submit(provedTransaction: tx.data)
-        return NetworkSealReceipt(commitment: commitment, txID: receipt.txID,
+        return NetworkSealReceipt(commitment: commitment, txID: receipt.txID, submitPending: receipt.pending,
                                   executeDuration: executeDuration, assembleDuration: tx.duration,
                                   transactionBytes: tx.data.count)
     }

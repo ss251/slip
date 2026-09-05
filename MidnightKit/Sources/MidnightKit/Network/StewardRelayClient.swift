@@ -14,8 +14,15 @@ public struct NetworkContext: Sendable, Equatable {
 
 public struct SubmissionReceipt: Sendable, Equatable, Decodable {
     public let txID: String
-    public init(txID: String) { self.txID = txID }
+    /// True when the client did not receive a txId (submit timed out) but the transaction
+    /// may already have been broadcast. The commitment is then watched via `confirm`.
+    public let pending: Bool
+    public init(txID: String, pending: Bool = false) { self.txID = txID; self.pending = pending }
     enum CodingKeys: String, CodingKey { case txID = "txId" }
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        txID = try c.decode(String.self, forKey: .txID); pending = false
+    }
 }
 
 public enum ConfirmationStatus: String, Sendable, Decodable { case pending, confirmed, rejected }
@@ -60,8 +67,18 @@ public struct HTTPStewardRelay: StewardRelay {
         request.httpMethod = "POST"
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         request.httpBody = provedTransaction
+        // Balancing + signing precede the relay's response even though it now returns at
+        // node acceptance; give that room so a slow-but-successful submit is not cut off.
+        request.timeoutInterval = 120
         authorize(&request)
-        let (data, response) = try await session.data(for: request)
+        let data: Data, response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            // The transaction may already be on-chain; report pending and let the caller
+            // resolve it through `confirm(commitmentHex:)` rather than showing a failure.
+            return SubmissionReceipt(txID: "", pending: true)
+        }
         try Self.check(response)
         return try JSONDecoder().decode(SubmissionReceipt.self, from: data)
     }

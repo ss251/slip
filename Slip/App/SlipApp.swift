@@ -56,7 +56,7 @@ struct SlipApp: App {
         let tracker = NetworkSealTracker(relayHost: setup?.relayURL.host ?? (arguments.contains("--network-preview") ? "steward.local" : nil))
         if arguments.contains("--network-preview") {
             // Synthetic, clearly-fake receipt so the network ticket is reachable via simctl.
-            tracker.record(NetworkSealReceipt(commitment: Data(repeating: 0xe8, count: 32), txID: "0x" + String(repeating: "5f", count: 32),
+            tracker.record(NetworkSealReceipt(commitment: Data(repeating: 0xe8, count: 32), txID: "0x" + String(repeating: "5f", count: 32), submitPending: false,
                                               executeDuration: .milliseconds(9), assembleDuration: .milliseconds(1641), transactionBytes: 5238),
                            for: appModel.localRound.id)
             tracker.record(.confirmed, for: appModel.localRound.id)

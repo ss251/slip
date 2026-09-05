@@ -247,7 +247,13 @@ struct TicketScreen: View {
                     fact("Proved", "on this iPhone")
                     if let networkReceipt {
                         fact("Left this iPhone", "the proof, never the pick")
-                        fact("Submitted", networkConfirmation == .confirmed ? "confirmed by the network" : (networkConfirmation == .rejected ? "rejected by the network" : "via the steward"))
+                        fact("Submitted", {
+                            switch networkConfirmation {
+                            case .confirmed: return "confirmed by the network"
+                            case .rejected: return "rejected by the network"
+                            default: return networkReceipt.submitPending ? "sent — confirming" : "via the steward"
+                            }
+                        }())
                         fact("Commitment", Self.short(networkReceipt.commitment.hexString), machine: true)
                         fact("Transaction", Self.short(networkReceipt.txID), machine: true)
                         fact("Execute", duration(networkReceipt.executeDuration))
