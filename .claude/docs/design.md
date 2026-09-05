@@ -68,9 +68,9 @@ the token discipline load-bearing rather than optional.
 
 ## Visual reference
 
-**Canonical: `docs/design/v5/` — twelve boards** (`00-how-slip-works` … `07-standings`,
-including `01b-home-first-run`, `02b-invite`, `03b-sealing`, `06a-opening`,
-`06b-verdict`). Source: the Paper page "v5 — the sealed pick". UI work reproduces
+**Canonical: `docs/design/v5/` — thirty boards** (`00-how-slip-works` …
+`11e-reveal-mismatch`: 24 routes plus three dark and three accessibility boards).
+Source: the Paper page "v5 — the sealed pick". UI work reproduces
 these — when code and PNG disagree, the PNG wins until the design file itself
 changes. The interactive flow explainer is `docs/how-slip-works.html`.
 

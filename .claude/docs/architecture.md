@@ -247,6 +247,32 @@ only) but become load-bearing the moment stakes exist:
 
 ## Disclosure ledger
 
+### App-only local proving demonstration (September 2026)
+
+The SwiftUI build does not implement the target chain client or encrypted witness
+store shown above. Each new local draft gets an immutable UUID, question, ordered
+side labels, crew name, creation time and sealing deadline. A domain-separated,
+length-prefixed canonical encoding of that public metadata is SHA-256 hashed and
+passed as `createSlip`'s question commitment in an in-memory `ContractRuntime`.
+No contract address or crew state is fetched from a network.
+
+`LocalSealingService` owns execute → prove in an actor. The device secret, choice,
+runtime proof-input JSON and private display snapshot stay in process memory;
+none are logged, serialized, saved, exported or submitted. Salt remains derived
+inside the existing circuit. Only the proof bytes, public commitment, round ID,
+question commitment and real execution/key-load/prove durations form the public
+receipt. A separate private display snapshot prevents a later draft edit from
+relabeling an already-sealed pick. Results are cached by immutable local round
+identity, not by a global one-shot flag.
+
+The presentation model owns its task. Departing the sealing screen or inactivating
+the scene invalidates
+late UI completion; native proving may finish and be cached by the actor, but
+cannot navigate a departed screen. This is session-only: terminating the app loses
+the witness and no later reveal is promised. Preview rosters and results are
+synthetic. Wallet, submission, indexer, persistent storage and verified network
+reveal remain separate, owner-scoped work.
+
 Everything that intentionally becomes public, in one place. Update this list with every `disclose()`:
 
 | What | When | Why |

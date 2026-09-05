@@ -5,6 +5,7 @@ struct NewSlipScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     @State private var firstSide = "Yes"
+    @State private var draftQuestion = PreviewContent.question
     @State private var secondSide = "No"
     @State private var sealDate = CreationDefaults.nextFriday(hour: CreationDefaults.sealHour)
     @State private var openDate = CreationDefaults.nextFriday(hour: CreationDefaults.openHour)
@@ -12,15 +13,15 @@ struct NewSlipScreen: View {
     @State private var artPalette = CreationDefaults.initialPalette
 
     var body: some View {
-        @Bindable var model = model
-
         ScrollView {
             VStack(spacing: SlipSpacing.large) {
-                creationHeader
-                artPicker
+                VStack(spacing: SlipSpacing.small) {
+                    creationHeader
+                    artPicker
+                }
 
-                TextField("Ask your crew something", text: $model.sampleQuestion, axis: .vertical)
-                    .font(SlipFont.large)
+                TextField("Ask your crew something", text: $draftQuestion, axis: .vertical)
+                    .font(SlipFont.title)
                     .foregroundStyle(SlipColor.ink)
                     .multilineTextAlignment(.center)
                     .lineLimit(CreationMetrics.questionLineRange)
@@ -60,27 +61,7 @@ struct NewSlipScreen: View {
     }
 
     private var creationHeader: some View {
-        ZStack {
-            Text("New slip")
-                .font(SlipFont.headline)
-                .foregroundStyle(SlipColor.ink)
-
-            HStack {
-                Button("Cancel") {
-                    model.back()
-                }
-                .font(SlipFont.body)
-                .foregroundStyle(SlipColor.secondary)
-                .frame(minHeight: SlipSize.minimumTap)
-
-                Spacer(minLength: SlipSpacing.zero)
-
-                SlipColor.clear
-                    .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
-                    .accessibilityHidden(true)
-            }
-        }
-        .frame(maxWidth: .infinity)
+        FormHeading(title: "New slip", cancel: model.back)
     }
 
     private var artPicker: some View {
@@ -90,7 +71,7 @@ struct NewSlipScreen: View {
                     artPalette = (artPalette + CreationDefaults.paletteIncrement) % CreationDefaults.paletteCount
                 } label: {
                     Image(systemName: "shuffle")
-                        .font(SlipFont.headline)
+                        .font(SlipFont.smallChromeIcon)
                         .foregroundStyle(SlipColor.ink)
                         .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
                         .background(SlipColor.card, in: Circle())
@@ -120,7 +101,7 @@ struct NewSlipScreen: View {
     }
 
     private var scheduleCard: some View {
-        SlipCard {
+        SlipCard(padding: SlipSpacing.tiny) {
             VStack(spacing: SlipSpacing.zero) {
                 CreationScheduleRow(
                     title: "Seal by",
@@ -136,7 +117,7 @@ struct NewSlipScreen: View {
                 ) {
                     editedDate = .open
                 }
-            }
+            }.padding(.horizontal, SlipSpacing.medium)
         }
     }
 
@@ -151,7 +132,7 @@ struct NewSlipScreen: View {
                     Text("Saturday crew")
                         .font(SlipFont.body)
                     Spacer(minLength: SlipSpacing.small)
-                    CreationAvatarStack()
+                    if !typeSize.isAccessibilitySize { CreationAvatarStack() }
                     Image(systemName: "chevron.right")
                         .font(SlipFont.footnoteBold)
                         .foregroundStyle(SlipColor.secondary)
@@ -177,7 +158,7 @@ struct NewSlipScreen: View {
     }
 
     private func createLocalPreview() {
-        let question = model.sampleQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
+        let question = draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
         let first = firstSide.trimmingCharacters(in: .whitespacesAndNewlines)
         let second = secondSide.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -193,10 +174,12 @@ struct NewSlipScreen: View {
             model.inform("The opening time needs to be after the sealing deadline.")
             return
         }
+        if let failure = LocalSealingService.deadlineError(for: sealDate, relativeTo: Date()) {
+            model.inform(failure.displayName)
+            return
+        }
 
-        model.sampleQuestion = question
-        model.sideLabels = [first, second]
-        model.selectedSide = first
+        model.startLocalRound(question: question, sides: [first, second], crewName: "Saturday crew", sealDeadline: sealDate)
         model.inform("Saved as a local preview. Invites are not sent until the network flow is connected.")
         model.go(.room)
     }
@@ -266,7 +249,7 @@ private struct CreationAvatarStack: View {
     var body: some View {
         HStack(spacing: -SlipSpacing.small) {
             ForEach(names, id: \.self) { name in
-                InitialAvatar(name: name, size: SlipSize.minimumTap)
+                InitialAvatar(name: name, size: SlipSize.sealMark)
                     .overlay(Circle().stroke(SlipColor.card, lineWidth: SlipStroke.emphasis))
             }
         }
@@ -325,9 +308,8 @@ struct InviteScreen: View {
 
             ScrollView {
                 VStack(spacing: SlipSpacing.large) {
-                    Spacer(minLength: typeSize.isAccessibilitySize ? SlipSpacing.large : SlipSpacing.expansive)
+                    Spacer(minLength: typeSize.isAccessibilitySize ? SlipSpacing.large : SlipSpacing.extraRoomy)
                     CrewArt(size: SlipSize.artHero)
-                        .padding(.bottom, SlipSpacing.standard)
 
                     VStack(spacing: SlipSpacing.small) {
                         Text("Ana invited you to")
@@ -339,7 +321,7 @@ struct InviteScreen: View {
                     }
 
                     HStack(spacing: SlipSpacing.medium) {
-                        CreationAvatarStack()
+                        if !typeSize.isAccessibilitySize { CreationAvatarStack() }
                         Text("Ana, Raj, Maya and 1 more")
                             .font(SlipFont.subheadline)
                             .foregroundStyle(SlipColor.secondary)
@@ -376,7 +358,7 @@ struct InviteScreen: View {
                     .padding(.top, SlipSpacing.large)
 
                     Text("Sealed on your own iPhone, opened together. Nobody reads a pick early.")
-                        .font(SlipFont.subheadline)
+                        .font(SlipFont.footnote)
                         .foregroundStyle(SlipColor.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, SlipSpacing.standard)
@@ -429,12 +411,7 @@ private enum CreationDefaults {
     }
 
     static func display(_ date: Date) -> String {
-        date.formatted(
-            .dateTime
-                .weekday(.wide)
-                .hour(.twoDigits(amPM: .omitted))
-                .minute(.twoDigits)
-        )
+        SlipDateText.weekdayTime(date)
     }
 }
 

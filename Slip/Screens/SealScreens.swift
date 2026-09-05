@@ -13,15 +13,21 @@ struct SealScreen: View {
     @State private var hold = SealHold()
     @State private var peek = false
     @State private var accessibleHold: Task<Void, Never>?
-    private var proving: Bool { mode == .sealing || flow.stage == .proving }
-    private var failed: Bool { mode == .proofFailed || flow.stage == .failed }
+    @State private var displayedRoundID: UUID?
+    private var proving: Bool { mode == .sealing || (flow.stage == .proving && flow.activeRoundID == model.localRound.id) }
+    private var failed: Bool { mode == .proofFailed || (flow.stage == .failed && flow.activeRoundID == model.localRound.id) }
     private var already: Bool { mode == .alreadySealed || model.hasLocalSeal }
+    private var displayedChoice: String {
+        if already, let display = flow.sealedDisplay, display.roundID == model.localRound.id { return display.selectedSide }
+        return model.selectedSide
+    }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: SlipSpacing.large) {
+            VStack(spacing: SlipSpacing.screen) {
                 SheetHeading(title: already ? "Already sealed" : proving ? "Sealing" : "Seal your pick", light: true)
-                ContextRow(light: true).padding(.top, SlipSpacing.small)
+                ContextRow(detail: model.isPreview ? "Saturday crew · 3 of 5 sealed"
+                           : "\(model.localRound.crewName) · local proof only", light: true)
                 pickCard.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
                 if already {
                     explanation("You sealed this on this iPhone", "A sealed pick can’t be changed or sealed twice. That’s the whole point.")
@@ -49,19 +55,37 @@ struct SealScreen: View {
         .background { AmbientBackground() }
         .foregroundStyle(SlipColor.onSeal)
         .preferredColorScheme(.dark)
-        .onDisappear { accessibleHold?.cancel(); hold.cancel(); peek = false }
+        .onAppear { displayedRoundID = model.localRound.id }
+        .onDisappear {
+            accessibleHold?.cancel(); hold.cancel(); peek = false
+            if let displayedRoundID { flow.depart(roundID: displayedRoundID) }
+        }
+        .onChange(of: flow.stage) { _, stage in
+            guard stage == .sealed, flow.receipt?.roundID == model.localRound.id,
+                  model.screen == .seal || model.screen == .sealing else { return }
+            model.markLocalSeal(roundID: model.localRound.id)
+            model.go(.ticket)
+        }
         .onChange(of: model.screen) { _, _ in peek = false }
+        .onChange(of: model.localRound.id) { oldID, newID in
+            flow.depart(roundID: oldID)
+            displayedRoundID = newID
+            accessibleHold?.cancel(); accessibleHold = nil; hold.cancel(); peek = false
+        }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { accessibleHold?.cancel(); accessibleHold = nil; hold.cancel(); peek = false }
+            if phase != .active {
+                accessibleHold?.cancel(); accessibleHold = nil; hold.cancel(); peek = false
+                flow.depart(roundID: model.localRound.id)
+            }
         }
     }
 
     private var pickCard: some View {
         VStack(spacing: SlipSpacing.medium) {
             Text("Your pick").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)
-            Text(already && !peek ? "•••" : model.selectedSide)
+            Text(already && !peek ? "•••" : displayedChoice)
                 .font(SlipFont.large).foregroundStyle(SlipColor.ink.opacity(proving ? SlipOpacity.muted : SlipOpacity.opaque))
-                .accessibilityLabel(already && !peek ? "Your pick is concealed" : "Your pick: \(model.selectedSide)")
+                .accessibilityLabel(already && !peek ? "Your pick is concealed" : "Your pick: \(displayedChoice)")
             if !already { Text("Only you can see this").font(SlipFont.footnote).foregroundStyle(SlipColor.secondary) }
             TimelineView(.animation(paused: hold.began == nil)) { context in
                 Circle().stroke(SlipColor.separator, lineWidth: SlipStroke.emphasis)
@@ -74,8 +98,8 @@ struct SealScreen: View {
             }.padding(.top, SlipSpacing.medium)
             if already { Text("Hold to peek").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary) }
         }
-        .frame(maxWidth: .infinity, minHeight: SlipSize.choiceCardHeight)
         .padding(SlipSpacing.large)
+        .frame(maxWidth: .infinity, minHeight: SlipSize.choiceCardHeight)
         .background(SlipColor.onSeal, in: RoundedRectangle(cornerRadius: SlipRadius.largeCard))
         .overlay { if contrast == .increased || accessibility.increaseContrast {
             RoundedRectangle(cornerRadius: SlipRadius.largeCard).stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
@@ -98,14 +122,14 @@ struct SealScreen: View {
                         .frame(maxWidth: .infinity, minHeight: SlipSize.compactButtonHeight)
                         .background(model.selectedSide == side ? SlipColor.onSeal : (reduceTransparency || accessibility.reduceTransparency) ? SlipColor.ambient : SlipColor.onSeal.opacity(SlipOpacity.subtle),
                                     in: RoundedRectangle(cornerRadius: SlipRadius.control))
-                }.buttonStyle(.plain).environment(\.colorScheme, .light)
+                }.buttonStyle(SlipPressStyle()).environment(\.colorScheme, .light)
                     .accessibilityAddTraits(model.selectedSide == side ? .isSelected : [])
             }
         }
     }
 
     @ViewBuilder private var bottom: some View {
-        BottomActions {
+        BottomActions(background: SlipColor.ambient) {
             if already {
                 PillButton(title: "See your ticket", tone: .white) { model.go(.ticket) }
             } else if failed {
@@ -115,10 +139,12 @@ struct SealScreen: View {
             } else if proving {
                 PillButton(title: "Sealing…", tone: .seal) {}.disabled(true).opacity(SlipOpacity.strong)
             } else {
-                Text("Seal by Friday 20:00").font(SlipFont.footnoteBold)
+                Text(model.isPreview ? "Seal by Friday 20:00" : "Seal by \(SlipDateText.weekdayTime(model.localRound.sealDeadline))").font(SlipFont.footnoteBold)
                 Text(hold.began == nil ? "Hold to seal" : "Keep holding…").font(SlipFont.headline)
                     .frame(maxWidth: .infinity, minHeight: SlipSize.buttonHeight)
                     .background(SlipColor.seal, in: Capsule()).contentShape(Capsule())
+                    .scaleEffect(hold.began != nil && !(reduceMotion || accessibility.reduceMotion) ? SlipMotion.pressScale : SlipOpacity.opaque)
+                    .animation(.easeOut(duration: SlipMotion.pressDuration), value: hold.began != nil)
                     .onLongPressGesture(minimumDuration: SlipMotion.holdDuration, maximumDistance: SlipSize.minimumTap,
                         pressing: { pressing in
                             if pressing { hold.start(at: Date.timeIntervalSinceReferenceDate) }
@@ -142,17 +168,7 @@ struct SealScreen: View {
 
     private func beginSeal() {
         accessibleHold?.cancel(); accessibleHold = nil; hold.cancel()
-        Task {
-            await flow.seal(choice: model.selectedSide == model.sideLabels.first ? 1 : 0)
-            if flow.stage == .sealed {
-                model.hasLocalSeal = true
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                withAnimation(reduceMotion || accessibility.reduceMotion ? .easeOut(duration: SlipMotion.cancelDuration)
-                              : .spring(duration: SlipMotion.stampDuration, bounce: SlipOpacity.subtle)) {
-                    model.go(.ticket)
-                }
-            }
-        }
+        flow.beginSeal(round: model.localRound, choice: model.selectedSide == model.sideLabels.first ? 1 : 0)
     }
 
     private func accessibleConfirm() {
@@ -173,9 +189,11 @@ struct SealScreen: View {
 
 struct AmbientBackground: View {
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             SlipColor.ambient
-            ArtField().opacity(SlipOpacity.muted)
+            ArtField().frame(height: SlipArt.backdropHeight)
+                .opacity(SlipOpacity.ambientWash)
+                .mask(LinearGradient(colors: [SlipColor.onSeal, SlipColor.clear], startPoint: .top, endPoint: .bottom))
         }.ignoresSafeArea()
     }
 }
@@ -186,35 +204,60 @@ struct TicketScreen: View {
     @Environment(SealFlowModel.self) private var flow
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
     @State private var peek = false
+    @State private var stamped = false
+    private var sealedDisplay: LocalSealedDisplay? {
+        flow.sealedDisplay?.roundID == model.localRound.id ? flow.sealedDisplay : nil
+    }
+    private var sealedChoice: String { sealedDisplay?.selectedSide ?? (model.isPreview ? model.selectedSide : "Unavailable") }
+    private var receipt: LocalSealReceipt? { flow.receipt?.roundID == model.localRound.id ? flow.receipt : nil }
 
     var body: some View {
+        if model.isPreview || (receipt != nil && sealedDisplay != nil) {
+            sealedTicket
+        } else {
+            VStack(spacing: SlipSpacing.large) {
+                Text("No ticket for this slip").font(SlipFont.title2)
+                Text("This local round has no completed proof in the current app session.")
+                    .font(SlipFont.body).foregroundStyle(SlipColor.secondary).multilineTextAlignment(.center)
+                PillButton(title: "Back to this slip") { model.go(.room) }
+            }.padding(SlipSpacing.screen)
+                .accessibilityIdentifier("ticket-unavailable")
+        }
+    }
+
+    private var sealedTicket: some View {
         ScrollView {
             VStack(spacing: SlipSpacing.large) {
-                SheetHeading(title: postingLater || flow.receipt != nil ? "● Sealed on this iPhone" : "● Sealed", light: true)
-                Text(model.sampleQuestion + (typeSize.isAccessibilitySize ? "" : " · Saturday crew"))
-                    .font(SlipFont.footnote).foregroundStyle(SlipColor.ticketSecondary).multilineTextAlignment(.center)
+                VStack(spacing: SlipSpacing.small) {
+                    SheetHeading(title: postingLater || receipt != nil ? "Sealed on this iPhone" : "Sealed", light: true, sealIndicator: true)
+                    Text((sealedDisplay?.question ?? model.sampleQuestion) + (typeSize.isAccessibilitySize ? "" : " · \(sealedDisplay?.crewName ?? PreviewContent.crew)"))
+                        .font(SlipFont.footnote).foregroundStyle(SlipColor.ticketSecondary).multilineTextAlignment(.center)
+                }
                 ticketCard.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
                 VStack(spacing: SlipSpacing.zero) {
                     fact("Proved", "on this iPhone")
-                    fact(flow.receipt == nil && !postingLater ? "Left this iPhone" : "Sharing", flow.receipt == nil && !postingLater ? "the proof, never the pick" : "Stays here in this local build")
-                    fact("Opens", "Friday 21:00, with everyone")
-                    if let receipt = flow.receipt {
+                    fact(receipt == nil && !postingLater ? "Left this iPhone" : "Sharing", receipt == nil && !postingLater ? "the proof, never the pick" : "Stays here in this local build")
+                    fact(receipt == nil ? "Opens" : "Retention", receipt == nil ? "Friday 21:00, with everyone" : "This app session only")
+                    if let receipt {
                         fact("Proof time", duration(receipt.proveDuration))
                         fact("Key load", duration(receipt.keyLoadDuration))
                         fact("Proof size", "\(receipt.proofData.count) bytes")
                     } else if !postingLater {
                         fact("Receipt", "0x8f2a…c41d", machine: true)
                     }
-                }.padding(.top, SlipSpacing.standard)
-                if postingLater || flow.receipt != nil {
+                }.padding(.top, SlipSpacing.small)
+                if postingLater || receipt != nil {
                     Text("Your proof was made here. This local build doesn’t post it, and keeps this session in memory.")
                         .font(SlipFont.footnote).foregroundStyle(SlipColor.ticketSecondary).multilineTextAlignment(.center)
                 }
             }.padding(.horizontal, SlipSpacing.large).padding(.bottom, SlipSpacing.large)
         }
         .safeAreaInset(edge: .bottom) {
-            BottomActions {
+            BottomActions(background: SlipColor.ticket) {
                 PillButton(title: "Done", tone: .white) { model.go(.room) }.environment(\.colorScheme, .light)
                 if !postingLater {
                     Button { model.inform("Ticket export will include only the public receipt. It isn’t available in this local build.") } label: {
@@ -226,24 +269,39 @@ struct TicketScreen: View {
         }.background(SlipColor.ticket.ignoresSafeArea()).preferredColorScheme(.dark)
             .onChange(of: scenePhase) { _, phase in if phase != .active { peek = false } }
             .onDisappear { peek = false }
+            .task {
+                guard !model.isPreview, receipt != nil,
+                      flow.consumeSealFeedback(roundID: model.localRound.id) else { stamped = true; return }
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                withAnimation(reduceMotion || accessibility.reduceMotion ? .easeOut(duration: SlipMotion.cancelDuration)
+                              : .spring(duration: SlipMotion.stampDuration, bounce: SlipMotion.stampBounce)) {
+                    stamped = true
+                }
+            }
     }
 
     private var ticketCard: some View {
         VStack(spacing: SlipSpacing.large) {
             HStack(spacing: SlipSpacing.small) {
                 CrewArt(size: SlipSize.largeIcon)
-                Text(flow.receipt == nil ? "Saturday crew · sealed Tuesday 18:42" : "Sealed on this iPhone just now")
+                Text(sealedDisplay.map { "\($0.crewName) · sealed \(SlipDateText.weekdayTime($0.sealedAt))" } ?? "Saturday crew · sealed Tuesday 18:42")
                     .font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
             }
             VStack(spacing: SlipSpacing.medium) {
                 Text("Your pick").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)
-                Text(peek ? model.selectedSide : "•••").font(SlipFont.large).foregroundStyle(SlipColor.ink)
-                    .accessibilityLabel(peek ? "Your pick: \(model.selectedSide)" : "Your pick is concealed")
+                Text(peek ? sealedChoice : "•••").font(SlipFont.large).foregroundStyle(SlipColor.ink)
+                    .accessibilityLabel(peek ? "Your pick: \(sealedChoice)" : "Your pick is concealed")
                 Circle().fill(SlipColor.seal).frame(width: SlipSize.sealDisc, height: SlipSize.sealDisc)
+                    .scaleEffect(stamped || model.isPreview || reduceMotion || accessibility.reduceMotion ? SlipOpacity.opaque : SlipMotion.stampStartScale)
+                    .opacity(stamped || model.isPreview || !(reduceMotion || accessibility.reduceMotion) ? SlipOpacity.opaque : SlipSpacing.zero)
                 Text("Hold to peek").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary)
             }
-        }.frame(maxWidth: .infinity, minHeight: SlipSize.receiptCardHeight)
-            .padding(SlipSpacing.large).background(SlipColor.onSeal, in: RoundedRectangle(cornerRadius: SlipRadius.largeCard))
+        }.padding(SlipSpacing.large)
+            .frame(maxWidth: .infinity, minHeight: SlipSize.receiptCardHeight)
+            .background(SlipColor.onSeal, in: RoundedRectangle(cornerRadius: SlipRadius.largeCard))
+            .overlay { if contrast == .increased || accessibility.increaseContrast {
+                RoundedRectangle(cornerRadius: SlipRadius.largeCard).stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
+            } }
             .environment(\.colorScheme, .light)
             .onLongPressGesture(minimumDuration: SlipMotion.pressDuration, pressing: { peek = $0 }, perform: {})
             .accessibilityAction(named: "Peek at your pick") {

@@ -5,12 +5,16 @@ struct GlassTabBar: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.slipAccessibility) private var accessibility
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         chrome
+            .frame(maxWidth: typeSize.isAccessibilitySize ? .infinity : SlipChrome.maximumWidth)
             .overlay { if contrast == .increased || accessibility.increaseContrast { Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis) } }
-            .padding(.horizontal, SlipSpacing.hero)
-            .padding(.bottom, SlipSpacing.tiny)
+            .shadow(color: SlipShadow.cardColor, radius: SlipShadow.floatingRadius, y: SlipShadow.floatingY)
+            .padding(.horizontal, SlipSpacing.screen)
+            .padding(.bottom, SlipChrome.bottomClearance)
+            .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder private var chrome: some View {
@@ -29,6 +33,7 @@ struct GlassTabBar: View {
             tab(.crews, title: "Crews", symbol: "person.2")
             tab(.you, title: "You", symbol: "person")
         }.padding(.horizontal, SlipSpacing.small).padding(.vertical, SlipSpacing.small)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func tab(_ screen: SlipScreen, title: String, symbol: String) -> some View {

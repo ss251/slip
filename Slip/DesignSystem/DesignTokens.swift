@@ -93,11 +93,12 @@ enum SlipSize {
     static let art: CGFloat = 56
     static let artLarge: CGFloat = 72
     static let artHero: CGFloat = 112
-    static let sealMark: CGFloat = 44
-    static let sealMarkLarge: CGFloat = 54
+    static let sealMark: CGFloat = 28
+    static let sealMarkLarge: CGFloat = 36
+    static let sealDot: CGFloat = 8
     static let sealDisc: CGFloat = 56
     static let sealDiscLarge: CGFloat = 64
-    static let buttonHeight: CGFloat = 58
+    static let buttonHeight: CGFloat = 54
     static let compactButtonHeight: CGFloat = 48
     static let tabBarHeight: CGFloat = 72
     static let segmentHeight: CGFloat = 44
@@ -121,6 +122,8 @@ enum SlipStroke {
 }
 
 enum SlipOpacity {
+    // SwiftUI composites gradients in linear space; keep small white copy >=4.5:1.
+    static let ambientWash: Double = 0.04
     static let faint: Double = 0.08
     static let subtle: Double = 0.16
     static let muted: Double = 0.32
@@ -130,8 +133,8 @@ enum SlipOpacity {
 
 enum SlipShadow {
     static let cardColor = SlipColor.shadow.opacity(SlipOpacity.faint)
-    static let cardRadius: CGFloat = 14
-    static let cardY: CGFloat = 7
+    static let cardRadius: CGFloat = 8
+    static let cardY: CGFloat = 3
     static let floatingRadius: CGFloat = 24
     static let floatingY: CGFloat = 12
 }
@@ -145,5 +148,11 @@ enum SlipMotion {
     static let revealDuration: TimeInterval = 0.5
     static let revealStagger: TimeInterval = 0.06
     static let stampStartScale: CGFloat = 1.15
+    static let stampBounce: Double = 0.2
 }
 
+enum SlipChrome {
+    static let maximumWidth: CGFloat = 254
+    static let bottomClearance: CGFloat = 8
+    static let scrollClearance: CGFloat = 88
+}

@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 enum SlipScreen: String, CaseIterable, Identifiable, Sendable {
@@ -48,7 +49,12 @@ final class AppModel {
     var selectedSide = "Yes"
     var sideLabels = ["Yes", "No"]
     var sampleQuestion = PreviewContent.question
-    var hasLocalSeal = false
+    private(set) var localRound = LocalRound(
+        question: PreviewContent.question,
+        sides: ["Yes", "No"],
+        crewName: PreviewContent.crew
+    )
+    private(set) var hasLocalSeal = false
 
     func go(_ destination: SlipScreen) {
         history.append(screen)
@@ -58,6 +64,47 @@ final class AppModel {
     func back() { screen = history.popLast() ?? .home }
     func tab(_ destination: SlipScreen) { history.removeAll(); screen = destination }
     func inform(_ message: String) { notice = message }
+
+    /// Freezes editable creation fields into a new local identity. Starting another
+    /// round invalidates only the app's public completion flag; sealed private display
+    /// facts remain owned by `SealFlowModel` for this process session.
+    @discardableResult
+    func startLocalRound(
+        question: String,
+        sides: [String],
+        crewName: String,
+        createdAt: Date = Date(),
+        sealDeadline: Date? = nil
+    ) -> LocalRound {
+        let round = LocalRound(
+            question: question,
+            sides: sides,
+            crewName: crewName,
+            createdAt: createdAt,
+            sealDeadline: sealDeadline
+        )
+        localRound = round
+        sampleQuestion = question
+        sideLabels = sides
+        if let firstSide = sides.first {
+            selectedSide = firstSide
+        }
+        hasLocalSeal = false
+        return round
+    }
+
+    /// Accepts completion only for the current local identity, preventing a proof from
+    /// an abandoned round being relabelled as the newly edited slip.
+    @discardableResult
+    func markLocalSeal(roundID: UUID) -> Bool {
+        guard localRound.id == roundID else { return false }
+        hasLocalSeal = true
+        return true
+    }
+
+    func isCurrentLocalRound(_ roundID: UUID) -> Bool {
+        localRound.id == roundID
+    }
 
     static func preview(_ screen: SlipScreen) -> AppModel {
         let model = AppModel()

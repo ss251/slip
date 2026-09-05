@@ -55,7 +55,7 @@ struct CrewsScreen: View {
                 } label: {
                     SlipCard {
                         HStack(spacing: SlipSpacing.medium) {
-                            Image(systemName: "square.and.arrow.down")
+                            Image(systemName: "square.and.arrow.up")
                                 .font(SlipFont.headline)
                             Text("Join a crew from a link")
                                 .font(SlipFont.body)
@@ -68,7 +68,7 @@ struct CrewsScreen: View {
                     }
                     .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SlipPressStyle())
 
                 Text("A crew is the people who can see who sealed. Picks stay sealed from everyone.")
                     .font(SlipFont.footnote)
@@ -118,12 +118,12 @@ private struct CrewSummaryRow: View {
                 } else {
                     HStack(spacing: SlipSpacing.medium) {
                         CrewArt(size: SlipSize.art, palette: palette)
-                        labels
-                        Spacer(minLength: SlipSpacing.small)
+                        labels.frame(maxWidth: .infinity, alignment: .leading)
                         Text(status)
                             .font(sealState == false ? SlipFont.subheadlineBold : SlipFont.subheadline)
                             .foregroundStyle(sealState == false ? SlipColor.ink : SlipColor.secondary)
                             .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: true, vertical: false)
                         if let sealState {
                             SealGlyph(sealed: sealState)
                         }
@@ -135,7 +135,7 @@ private struct CrewSummaryRow: View {
             .frame(minHeight: CrewMetrics.summaryRowHeight)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SlipPressStyle())
     }
 
     private var labels: some View {
@@ -147,6 +147,7 @@ private struct CrewSummaryRow: View {
                 .font(SlipFont.subheadline)
                 .foregroundStyle(SlipColor.secondary)
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -159,11 +160,11 @@ struct CrewDetailScreen: View {
             ArtBackdrop()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: SlipSpacing.large) {
+                VStack(alignment: .leading, spacing: SlipSpacing.zero) {
                     toolbar
-                    identity
-                    openSlip
-                    members
+                    identity.padding(.top, SlipSpacing.tiny)
+                    openSlip.padding(.top, SlipSpacing.large)
+                    members.padding(.top, SlipSpacing.large)
                 }
                 .padding(.horizontal, SlipSpacing.screen)
                 .padding(.top, SlipSpacing.small)
@@ -184,7 +185,7 @@ struct CrewDetailScreen: View {
                     .foregroundStyle(SlipColor.ink)
                     .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SlipPressStyle())
             .accessibilityLabel("Back")
 
             Spacer(minLength: SlipSpacing.standard)
@@ -197,15 +198,15 @@ struct CrewDetailScreen: View {
                     .foregroundStyle(SlipColor.ink)
                     .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SlipPressStyle())
             .accessibilityLabel("Share crew")
         }
     }
 
     private var identity: some View {
-        VStack(spacing: SlipSpacing.medium) {
+        VStack(spacing: SlipSpacing.small) {
             CrewArt(size: SlipSize.artLarge)
-                .padding(.bottom, SlipSpacing.small)
+                .padding(.bottom, SlipSpacing.medium)
             Text("Saturday crew")
                 .font(SlipFont.title2)
                 .foregroundStyle(SlipColor.ink)
@@ -222,8 +223,9 @@ struct CrewDetailScreen: View {
                     .padding(.horizontal, SlipSpacing.screen)
                     .frame(minHeight: SlipSize.minimumTap)
                     .background(SlipColor.fill, in: Capsule())
+                    .overlay { CrewCapsuleBorder() }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SlipPressStyle())
         }
         .frame(maxWidth: .infinity)
     }
@@ -262,9 +264,8 @@ struct CrewDetailScreen: View {
                 }
                 .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SlipPressStyle())
         }
-        .padding(.top, SlipSpacing.standard)
     }
 
     private var openSlipLabels: some View {
@@ -306,11 +307,12 @@ struct YouScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SlipSpacing.large) {
+            VStack(alignment: .leading, spacing: SlipSpacing.screen) {
                 profileHeader
                 profileIdentity
                 stats
                 history
+                    .padding(.top, SlipSpacing.tiny)
                 settings
             }
             .padding(.horizontal, SlipSpacing.screen)
@@ -335,22 +337,38 @@ struct YouScreen: View {
             .padding(.horizontal, SlipSpacing.standard)
             .frame(minHeight: SlipSize.minimumTap)
             .background(SlipColor.fill, in: Capsule())
+            .overlay { CrewCapsuleBorder() }
+            .buttonStyle(SlipPressStyle())
         }
     }
 
     private var profileIdentity: some View {
-        HStack(spacing: SlipSpacing.standard) {
-            InitialAvatar(name: "You", size: SlipSize.avatarLarge)
-            VStack(alignment: .leading, spacing: SlipSpacing.small) {
-                Text("Sailesh")
-                    .font(SlipFont.title2)
-                    .foregroundStyle(SlipColor.ink)
-                Text("3 crews · sealing since June")
-                    .font(SlipFont.body)
-                    .foregroundStyle(SlipColor.secondary)
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SlipSpacing.standard) {
+                    InitialAvatar(name: "You", size: SlipSize.avatarLarge)
+                    profileLabels
+                }
+            } else {
+                HStack(spacing: SlipSpacing.standard) {
+                    InitialAvatar(name: "You", size: SlipSize.avatarLarge)
+                    profileLabels
+                }
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var profileLabels: some View {
+        VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+            Text("Sailesh")
+                .font(SlipFont.title2)
+                .foregroundStyle(SlipColor.ink)
+            Text("3 crews · sealing since June")
+                .font(SlipFont.subheadline)
+                .foregroundStyle(SlipColor.secondary)
+        }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder private var stats: some View {
@@ -434,8 +452,8 @@ private struct ProfileStat: View {
     let label: String
 
     var body: some View {
-        SlipCard {
-            VStack(alignment: .leading, spacing: SlipSpacing.small) {
+        SlipCard(padding: SlipSpacing.zero) {
+            VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
                 Text(value)
                     .font(SlipFont.title2)
                     .foregroundStyle(SlipColor.ink)
@@ -443,7 +461,9 @@ private struct ProfileStat: View {
                     .font(SlipFont.footnote)
                     .foregroundStyle(SlipColor.secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: SlipSize.minimumTap, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: CrewMetrics.profileStatContentHeight, alignment: .leading)
+            .padding(.horizontal, SlipSpacing.standard)
+            .padding(.vertical, SlipSpacing.medium)
         }
     }
 }
@@ -467,7 +487,7 @@ private struct ProfileHistoryRow: View {
                 if typeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: SlipSpacing.medium) {
                         HStack {
-                            CrewArt(size: SlipSize.art, palette: palette)
+                            CrewArt(size: SlipSize.artSmall, palette: palette)
                             Spacer(minLength: SlipSpacing.standard)
                             historyAccessory
                         }
@@ -475,9 +495,8 @@ private struct ProfileHistoryRow: View {
                     }
                 } else {
                     HStack(spacing: SlipSpacing.medium) {
-                        CrewArt(size: SlipSize.art, palette: palette)
-                        historyLabels
-                        Spacer(minLength: SlipSpacing.small)
+                        CrewArt(size: SlipSize.artSmall, palette: palette)
+                        historyLabels.frame(maxWidth: .infinity, alignment: .leading)
                         historyAccessory
                     }
                 }
@@ -486,20 +505,21 @@ private struct ProfileHistoryRow: View {
             .padding(.vertical, SlipSpacing.medium)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SlipPressStyle())
     }
 
     private var historyLabels: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
             Text(question)
-                .font(SlipFont.headline)
+                .font(SlipFont.subheadlineBold)
                 .foregroundStyle(SlipColor.ink)
                 .multilineTextAlignment(.leading)
             Text(detail)
-                .font(SlipFont.subheadline)
+                .font(SlipFont.footnote)
                 .foregroundStyle(SlipColor.secondary)
                 .multilineTextAlignment(.leading)
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder private var historyAccessory: some View {
@@ -527,7 +547,8 @@ private struct ProfileSettingRow: View {
                     VStack(alignment: .leading, spacing: SlipSpacing.small) {
                         Text(title).font(SlipFont.body).foregroundStyle(SlipColor.ink)
                         HStack(spacing: SlipSpacing.small) {
-                            Text(detail).font(SlipFont.subheadline).foregroundStyle(SlipColor.secondary)
+                            Text(detail).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: SlipSpacing.small)
                             Image(systemName: "chevron.right")
                                 .font(SlipFont.footnoteBold)
@@ -537,8 +558,10 @@ private struct ProfileSettingRow: View {
                 } else {
                     HStack(spacing: SlipSpacing.medium) {
                         Text(title).font(SlipFont.body).foregroundStyle(SlipColor.ink)
-                        Spacer(minLength: SlipSpacing.small)
-                        Text(detail).font(SlipFont.subheadline).foregroundStyle(SlipColor.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(detail).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: true, vertical: false)
                         Image(systemName: "chevron.right")
                             .font(SlipFont.footnoteBold)
                             .foregroundStyle(SlipColor.secondary)
@@ -549,7 +572,18 @@ private struct ProfileSettingRow: View {
             .frame(minHeight: SlipSize.minimumTap)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SlipPressStyle())
+    }
+}
+
+private struct CrewCapsuleBorder: View {
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
+
+    var body: some View {
+        if contrast == .increased || accessibility.increaseContrast {
+            Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
+        }
     }
 }
 
@@ -575,6 +609,7 @@ private enum CrewMetrics {
     static let bookPalette = 2
     static let lastItemOffset = 1
     static let summaryRowHeight: CGFloat = 80
+    static let profileStatContentHeight: CGFloat = 50
     static let summaryDividerInset: CGFloat = SlipSize.art + SlipSpacing.standard * 2
-    static let historyDividerInset: CGFloat = SlipSize.art + SlipSpacing.standard * 2
+    static let historyDividerInset: CGFloat = SlipSize.artSmall + SlipSpacing.standard + SlipSpacing.medium
 }

@@ -27,6 +27,7 @@ struct SlipApp: App {
         }
         if let theme = value("--appearance") { selectedAppearance = theme == "dark" ? .dark : .light }
         if arguments.contains("--accessibility") { selectedType = .accessibility1 }
+        if arguments.contains("--accessibility-max") { selectedType = .accessibility5 }
         if arguments.contains("--xl") { selectedType = .xLarge }
         motion = arguments.contains("--reduce-motion")
         transparency = arguments.contains("--reduce-transparency")
@@ -43,7 +44,7 @@ struct SlipApp: App {
     var body: some Scene {
         WindowGroup {
             SlipRootView(model: model, flow: flow)
-                .preferredColorScheme(appearance)
+                .preferredColorScheme(model.screen.usesDarkCanvas ? .dark : appearance)
                 .modifier(DebugAccessibility(typeSize: typeSize, reduceMotion: reduceMotion,
                                              reduceTransparency: reduceTransparency, increaseContrast: increaseContrast))
         }

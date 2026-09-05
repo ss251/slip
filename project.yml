@@ -50,11 +50,11 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.sailesh.slip
         PRODUCT_NAME: Slip
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Slip/Resources/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: Slip
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.social-networking
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIAppFonts: [JetBrainsMono-Regular.ttf]
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         ENABLE_PREVIEWS: YES
 

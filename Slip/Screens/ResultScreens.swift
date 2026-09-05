@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum OpeningMode: Equatable, Sendable {
     case opening
@@ -6,8 +7,46 @@ enum OpeningMode: Equatable, Sendable {
     case mismatch
 }
 
+struct RevealVisualState: Equatable, Sendable {
+    let opacity: Double
+    let rotationDegrees: Double
+}
+
+enum RevealMotionPlan {
+    static let maximumStaggeredRows = 5
+    static let noBounce: Double = 0
+    static let hiddenOpacity: Double = 0
+    static let restingAngle: Double = 0
+    static let hiddenAngle: Double = -90
+    static let axisX: CGFloat = 1
+    static let axisY: CGFloat = 0
+    static let axisZ: CGFloat = 0
+    static let perspective: CGFloat = 0.72
+
+    static func delay(forRowAt index: Int) -> TimeInterval {
+        let nonnegativeIndex = max(index, 0)
+        let cappedIndex = min(nonnegativeIndex, maximumStaggeredRows - 1)
+        return TimeInterval(cappedIndex) * SlipMotion.revealStagger
+    }
+
+    static func visualState(isRevealed: Bool, reduceMotion: Bool) -> RevealVisualState {
+        RevealVisualState(
+            opacity: isRevealed ? SlipOpacity.opaque : hiddenOpacity,
+            rotationDegrees: isRevealed || reduceMotion ? restingAngle : hiddenAngle
+        )
+    }
+
+    static func completedRows(
+        afterCancelling revealedRows: Set<Int>,
+        participatingIndices: [Int]
+    ) -> Set<Int> {
+        revealedRows.union(participatingIndices)
+    }
+}
+
 struct SealedRoomScreen: View {
     @Environment(AppModel.self) private var model
+    @Environment(SealFlowModel.self) private var flow
 
     var body: some View {
         ScrollView {
@@ -21,11 +60,11 @@ struct SealedRoomScreen: View {
                     CrewArt(size: SlipSize.artLarge)
 
                     VStack(spacing: SlipSpacing.medium) {
-                        Text(PreviewContent.question)
+                        Text(displayedQuestion)
                             .font(SlipFont.title2)
                             .foregroundStyle(SlipColor.ink)
                             .multilineTextAlignment(.center)
-                        Text("Saturday crew · 3 of 5 sealed")
+                        Text(roomStatus)
                             .font(SlipFont.body)
                             .foregroundStyle(SlipColor.secondary)
                     }
@@ -43,37 +82,79 @@ struct SealedRoomScreen: View {
         .background { ArtBackdrop() }
         .safeAreaInset(edge: .bottom, spacing: SlipSpacing.zero) {
             BottomActions {
-                PillButton(title: "Nudge Maya & Tomás", tone: .secondary) {
-                    model.inform("This preview did not send a nudge to Maya or Tomás.")
+                if model.isPreview {
+                    PillButton(title: "Nudge Maya & Tomás", tone: .secondary) {
+                        model.inform("This preview did not send a nudge to Maya or Tomás.")
+                    }
+                    Text("Everyone opens together at Friday 21:00.")
+                        .font(SlipFont.footnote)
+                        .foregroundStyle(SlipColor.secondary)
+                        .multilineTextAlignment(.center)
+                } else {
+                    PillButton(title: "Shared nudges unavailable", tone: .secondary) {
+                        model.inform("No nudge was sent. This local build has no connected crew.")
+                    }
+                    Text("Opening schedule is unavailable in this local build.")
+                        .font(SlipFont.footnote)
+                        .foregroundStyle(SlipColor.secondary)
+                        .multilineTextAlignment(.center)
                 }
-                Text("Everyone opens together at Friday 21:00.")
-                    .font(SlipFont.footnote)
-                    .foregroundStyle(SlipColor.secondary)
-                    .multilineTextAlignment(.center)
             }
         }
     }
 
+    private var currentSealedDisplay: LocalSealedDisplay? {
+        guard
+            let display = flow.sealedDisplay,
+            let receipt = flow.receipt,
+            display.roundID == model.localRound.id,
+            receipt.roundID == model.localRound.id
+        else { return nil }
+        return display
+    }
+
+    private var displayedQuestion: String {
+        model.isPreview ? PreviewContent.question : model.localRound.question
+    }
+
+    private var roomStatus: String {
+        model.isPreview ? "Saturday crew · 3 of 5 sealed" : "\(model.localRound.crewName) · local-only roster"
+    }
+
     private var rows: [ResultRosterItem] {
-        let ownPick = model.hasLocalSeal ? model.selectedSide : "Yes"
+        if model.isPreview {
+            return [
+                ResultRosterItem(name: "You", value: "Yes", valueDetail: "only you can see this"),
+                ResultRosterItem(name: "Ana", value: "Sealed", sealed: true, valueSecondary: true),
+                ResultRosterItem(name: "Raj", value: "Sealed", sealed: true, valueSecondary: true),
+                ResultRosterItem(name: "Maya", value: "Waiting", sealed: false, valueSecondary: true),
+                ResultRosterItem(name: "Tomás", value: "Waiting", sealed: false, valueSecondary: true)
+            ]
+        }
+
+        let ownRow = currentSealedDisplay.map {
+            ResultRosterItem(name: "You", value: $0.selectedSide, valueDetail: "only you can see this")
+        } ?? ResultRosterItem(name: "You", detail: "No completed proof for this slip")
+
         return [
-            ResultRosterItem(name: "You", value: ownPick, valueDetail: "only you can see this"),
-            ResultRosterItem(name: "Ana", value: "Sealed", sealed: true, valueSecondary: true),
-            ResultRosterItem(name: "Raj", value: "Sealed", sealed: true, valueSecondary: true),
-            ResultRosterItem(name: "Maya", value: "Waiting", sealed: false, valueSecondary: true),
-            ResultRosterItem(name: "Tomás", value: "Waiting", sealed: false, valueSecondary: true)
+            ownRow,
+            ResultRosterItem(name: "Crew", detail: "Not connected in this local build")
         ]
+    }
+
+    private var countdownText: String {
+        model.isPreview ? "Opens in 14h 22m" : "Opening schedule unavailable"
     }
 
     @ViewBuilder private var countdownChip: some View {
 #if DEBUG
-        StatusChip(text: "Opens in 14h 22m")
+        ResultStatusChip(text: countdownText)
             .contextMenu {
                 Button("Preview opening") { model.go(.opening) }
             }
             .accessibilityHint("Touch and hold to preview opening locally")
 #else
-        StatusChip(text: "Opens in 14h 22m")
+        ResultStatusChip(text: countdownText)
 #endif
     }
 }
@@ -85,10 +166,15 @@ struct OpeningScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SlipSpacing.large) {
-                ScreenHeader(title: PreviewContent.question, subtitle: headerSubtitle)
+                openingHeader
+                if !model.isPreview { FixtureDisclosure() }
                 openingStatusChip
 
-                ResultRosterCard(rows: rows)
+                ResultRosterCard(
+                    rows: rows,
+                    usesCompactRows: mode != .opening,
+                    revealsOnAppear: mode == .opening
+                )
 
                 ResultVerification(
                     headline: verificationHeadline,
@@ -100,19 +186,23 @@ struct OpeningScreen: View {
                     stewardCard
                 } else if mode == .mismatch {
                     mismatchCard
-                    Text("Ana calls it once Saturday’s over.")
-                        .font(SlipFont.footnote)
-                        .foregroundStyle(SlipColor.secondary)
-                        .padding(.horizontal, SlipSpacing.tiny)
                 }
             }
             .padding(.horizontal, SlipSpacing.screen)
+            .padding(.top, ResultLayout.shellTopPadding)
             .padding(.bottom, SlipSpacing.section)
         }
         .scrollIndicators(.hidden)
         .background { ArtBackdrop() }
         .safeAreaInset(edge: .bottom, spacing: SlipSpacing.zero) {
             BottomActions {
+                if mode == .mismatch {
+                    Text("Ana calls it once Saturday’s over.")
+                        .font(SlipFont.footnote)
+                        .foregroundStyle(SlipColor.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, SlipSpacing.tiny)
+                }
                 PillButton(title: actionTitle, tone: .secondary) {
                     model.inform(actionNotice)
                 }
@@ -130,13 +220,25 @@ struct OpeningScreen: View {
         mode == .opening ? "SATURDAY CREW · OPENING" : "SATURDAY CREW · OPENED"
     }
 
+    private var openingHeader: some View {
+        VStack(alignment: .leading, spacing: SlipSpacing.small) {
+            Text(headerSubtitle)
+                .font(SlipFont.footnoteBold)
+                .foregroundStyle(SlipColor.secondary)
+            Text(PreviewContent.question)
+                .font(SlipFont.title2)
+                .foregroundStyle(SlipColor.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var statusText: String {
         mode == .opening ? "4 of 5 opened" : "Everyone opened"
     }
 
     @ViewBuilder private var openingStatusChip: some View {
 #if DEBUG
-        StatusChip(text: statusText, symbol: "circle.fill")
+        ResultStatusChip(text: statusText, symbol: "circle.fill")
             .contextMenu {
                 if mode == .opening {
                     Button("Preview everyone opened") { model.go(.awaiting) }
@@ -146,7 +248,7 @@ struct OpeningScreen: View {
             }
             .accessibilityHint("Touch and hold for the next local preview state")
 #else
-        StatusChip(text: statusText, symbol: "circle.fill")
+        ResultStatusChip(text: statusText, symbol: "circle.fill")
 #endif
     }
 
@@ -232,15 +334,17 @@ struct OpeningScreen: View {
 
 struct VerdictScreen: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let satOut: Bool
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SlipSpacing.screen) {
-                verdictHeader
+            VStack(alignment: .leading, spacing: ResultLayout.compactSectionSpacing) {
+                verdictHeader.padding(.bottom, SlipSpacing.medium)
+                if !model.isPreview { FixtureDisclosure() }
                 VerdictBars(satOut: satOut)
                 winnerCard
-                ResultRosterCard(rows: resultRows)
+                ResultRosterCard(rows: resultRows, usesCompactRows: true, showsVerdict: true)
 
                 if satOut {
                     ResultVerification(
@@ -256,6 +360,7 @@ struct VerdictScreen: View {
                 }
             }
             .padding(.horizontal, SlipSpacing.screen)
+            .padding(.top, ResultLayout.shellTopPadding)
             .padding(.bottom, SlipSpacing.section)
         }
         .scrollIndicators(.hidden)
@@ -283,22 +388,43 @@ struct VerdictScreen: View {
 
     private var winnerCard: some View {
         SlipCard {
-            HStack(spacing: SlipSpacing.medium) {
-                InitialAvatar(name: "You")
-                VStack(alignment: .leading, spacing: SlipSpacing.micro) {
-                    Text("You called it").font(SlipFont.headline)
-                    Text("Sealed Yes on Tuesday")
-                        .font(SlipFont.footnote)
-                        .foregroundStyle(SlipColor.secondary)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    HStack(alignment: .top, spacing: SlipSpacing.medium) {
+                        InitialAvatar(name: "You")
+                        VStack(alignment: .leading, spacing: SlipSpacing.small) {
+                            winnerCopy
+                            winnerScore
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else {
+                    HStack(spacing: SlipSpacing.medium) {
+                        InitialAvatar(name: "You")
+                        winnerCopy
+                        Spacer(minLength: SlipSpacing.small)
+                        winnerScore
+                    }
                 }
-                Spacer(minLength: SlipSpacing.small)
-                Text("+1")
-                    .font(SlipFont.title2)
-                    .foregroundStyle(SlipColor.win)
             }
             .foregroundStyle(SlipColor.ink)
             .accessibilityElement(children: .combine)
         }
+    }
+
+    private var winnerCopy: some View {
+        VStack(alignment: .leading, spacing: SlipSpacing.micro) {
+            Text("You called it").font(SlipFont.headline)
+            Text("Sealed Yes on Tuesday")
+                .font(SlipFont.footnote)
+                .foregroundStyle(SlipColor.secondary)
+        }
+    }
+
+    private var winnerScore: some View {
+        Text("+1")
+            .font(SlipFont.title2)
+            .foregroundStyle(SlipColor.win)
     }
 
     private var resultRows: [ResultRosterItem] {
@@ -346,12 +472,16 @@ struct VerdictScreen: View {
 struct StandingsScreen: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
     @State private var period: StandingsPeriod = .week
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SlipSpacing.screen) {
+            VStack(alignment: .leading, spacing: ResultLayout.compactSectionSpacing) {
                 ScreenHeader(title: "Standings", subtitle: "SATURDAY CREW")
+                    .padding(.bottom, SlipSpacing.small)
+                if !model.isPreview { FixtureDisclosure() }
                 periodPicker
                 standingsHero
                 rankingCard
@@ -361,6 +491,7 @@ struct StandingsScreen: View {
                     .padding(.horizontal, SlipSpacing.tiny)
             }
             .padding(.horizontal, SlipSpacing.screen)
+            .padding(.top, ResultLayout.shellTopPadding)
             .padding(.bottom, SlipSpacing.section)
         }
         .scrollIndicators(.hidden)
@@ -376,8 +507,13 @@ struct StandingsScreen: View {
             periodButton(.week, title: "This week")
             periodButton(.season, title: "Season")
         }
-        .padding(SlipSpacing.tiny)
+        .padding(.horizontal, SlipSpacing.tiny)
         .background(SlipColor.fill, in: Capsule())
+        .overlay {
+            if contrast == .increased || accessibility.increaseContrast {
+                Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.standard)
+            }
+        }
         .frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : ResultLayout.segmentWidth)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Standings period")
@@ -402,7 +538,7 @@ struct StandingsScreen: View {
             VStack(spacing: SlipSpacing.zero) {
                 ZStack(alignment: .topTrailing) {
                     ArtField()
-                        .frame(height: SlipSize.heroBannerHeight)
+                        .frame(height: ResultLayout.leaderArtHeight)
                         .clipShape(UnevenRoundedRectangle(
                             topLeadingRadius: SlipRadius.card,
                             bottomLeadingRadius: SlipSpacing.zero,
@@ -410,35 +546,49 @@ struct StandingsScreen: View {
                             topTrailingRadius: SlipRadius.card
                         ))
 
-                    Label(period == .week ? "Week 4 leader" : "Season leader", systemImage: "crown")
-                        .font(SlipFont.subheadlineBold)
-                        .foregroundStyle(SlipColor.ink)
-                        .padding(.horizontal, SlipSpacing.standard)
-                        .frame(minHeight: SlipSize.minimumTap)
-                        .background(SlipColor.card, in: Capsule())
+                    ResultBadge(
+                        title: period == .week ? "Week 4 leader" : "Season leader",
+                        symbol: "crown"
+                    )
                         .padding(SlipSpacing.medium)
                 }
 
-                HStack(spacing: SlipSpacing.standard) {
-                    InitialAvatar(name: "Ana", size: SlipSize.avatarLarge)
-                        .offset(y: ResultLayout.leaderAvatarLift)
-                    VStack(alignment: .leading, spacing: SlipSpacing.micro) {
-                        Text(period == .week ? "Ana takes the week" : "Ana leads the season")
-                            .font(SlipFont.headline)
-                        Text(period == .week ? "4 of 4 called · first to seal" : "18 of 28 called")
-                            .font(SlipFont.footnote)
-                            .foregroundStyle(SlipColor.secondary)
-                    }
-                    Spacer(minLength: SlipSpacing.small)
-                    Text(period == .week ? "12" : "64")
-                        .font(SlipFont.large)
-                }
-                .foregroundStyle(SlipColor.ink)
-                .padding(.horizontal, SlipSpacing.screen)
-                .padding(.bottom, SlipSpacing.standard)
+                leaderSummary
             }
             .accessibilityElement(children: .combine)
         }
+    }
+
+    @ViewBuilder private var leaderSummary: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: SlipSpacing.medium) {
+                InitialAvatar(name: "Ana", size: SlipSize.avatarLarge)
+                leaderCopy
+                Text(period == .week ? "12" : "64").font(SlipFont.large)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(SlipSpacing.screen)
+        } else {
+            HStack(spacing: SlipSpacing.standard) {
+                InitialAvatar(name: "Ana", size: SlipSize.avatarLarge)
+                    .offset(y: ResultLayout.leaderAvatarLift)
+                leaderCopy
+                Spacer(minLength: SlipSpacing.small)
+                Text(period == .week ? "12" : "64").font(SlipFont.large)
+            }
+            .padding(.horizontal, SlipSpacing.screen)
+        }
+    }
+
+    private var leaderCopy: some View {
+        VStack(alignment: .leading, spacing: SlipSpacing.micro) {
+            Text(period == .week ? "Ana takes the week" : "Ana leads the season")
+                .font(SlipFont.headline)
+            Text(period == .week ? "4 of 4 called · first to seal" : "18 of 28 called")
+                .font(SlipFont.footnote)
+                .foregroundStyle(SlipColor.secondary)
+        }
+        .foregroundStyle(SlipColor.ink)
     }
 
     private var rankingCard: some View {
@@ -468,6 +618,7 @@ struct SettleScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SlipSpacing.large) {
                 SheetHeading(title: "Call it")
+                if !model.isPreview { FixtureDisclosure() }
                 ContextRow(detail: "Saturday crew · 5 of 5 opened · your call")
                 Text("What happened?")
                     .font(SlipFont.large)
@@ -485,7 +636,7 @@ struct SettleScreen: View {
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom, spacing: SlipSpacing.zero) {
             BottomActions {
-                PillButton(title: outcome.actionTitle) { model.go(.verdict) }
+                PillButton(title: outcome.actionTitle, action: showPreviewVerdict)
                 Text("Anyone who sealed can challenge within 24 hours. A challenge voids the round.")
                     .font(SlipFont.footnote)
                     .foregroundStyle(SlipColor.secondary)
@@ -506,6 +657,11 @@ struct SettleScreen: View {
         CallChoiceButton(outcome: .rained, selection: $outcome)
         CallChoiceButton(outcome: .dry, selection: $outcome)
     }
+
+    private func showPreviewVerdict() {
+        model.go(.verdict)
+        model.inform("Preview only. No call was submitted; the result shown is a sample, not a shared round.")
+    }
 }
 
 struct ChallengeScreen: View {
@@ -516,6 +672,7 @@ struct ChallengeScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SlipSpacing.large) {
                 SheetHeading(title: "Challenge")
+                if !model.isPreview { FixtureDisclosure() }
 
                 VStack(alignment: .leading, spacing: SlipSpacing.medium) {
                     Text("Challenge Ana’s call?")
@@ -535,7 +692,7 @@ struct ChallengeScreen: View {
         .scrollIndicators(.hidden)
         .safeAreaInset(edge: .bottom, spacing: SlipSpacing.zero) {
             BottomActions {
-                PillButton(title: "Challenge and void the round") { model.go(.voided) }
+                PillButton(title: "Challenge and void the round", action: showPreviewVoided)
                 Button("Keep Ana’s call", action: model.back)
                     .font(SlipFont.headline)
                     .foregroundStyle(SlipColor.secondary)
@@ -543,6 +700,11 @@ struct ChallengeScreen: View {
                     .buttonStyle(.plain)
             }
         }
+    }
+
+    private func showPreviewVoided() {
+        model.go(.voided)
+        model.inform("Preview only. No challenge was submitted and no shared round was voided.")
     }
 
     private var challengeIdentityCard: some View {
@@ -575,6 +737,7 @@ struct ChallengeScreen: View {
 
 struct VoidedScreen: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let rows = [
         ResultRosterItem(name: "You", value: "Yes", score: "—"),
@@ -588,8 +751,9 @@ struct VoidedScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SlipSpacing.screen) {
                 ScreenHeader(title: "No result.", subtitle: "SATURDAY CREW · VOIDED")
+                if !model.isPreview { FixtureDisclosure() }
                 challengeSummary
-                ResultRosterCard(rows: rows)
+                ResultRosterCard(rows: rows, usesCompactRows: true)
                 ResultVerification(
                     headline: "5 of 5 opened, every reveal matched its seal.",
                     detail: "A challenge voids the round. Nobody scores. The next slip starts clean."
@@ -599,6 +763,7 @@ struct VoidedScreen: View {
                 }
             }
             .padding(.horizontal, SlipSpacing.screen)
+            .padding(.top, ResultLayout.shellTopPadding)
             .padding(.bottom, SlipSpacing.section)
         }
         .scrollIndicators(.hidden)
@@ -612,14 +777,17 @@ struct VoidedScreen: View {
 
     private var challengeSummary: some View {
         SlipCard {
-            ViewThatFits(in: .horizontal) {
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: SlipSpacing.medium) {
+                        ChallengerAvatars()
+                        challengeSummaryCopy
+                    }
+                } else {
                 HStack(alignment: .top, spacing: SlipSpacing.standard) {
                     ChallengerAvatars()
                     challengeSummaryCopy
                 }
-                VStack(alignment: .leading, spacing: SlipSpacing.medium) {
-                    ChallengerAvatars()
-                    challengeSummaryCopy
                 }
             }
         }
@@ -641,6 +809,14 @@ struct VoidedScreen: View {
 private enum ResultLayout {
     static let segmentWidth: CGFloat = 208
     static let leaderAvatarLift = -SlipSpacing.large
+    static let shellTopPadding = SlipSpacing.large
+    static let compactSectionSpacing = SlipSpacing.medium
+    static let leaderArtHeight = SlipSpacing.stage
+    static let compactAvatar = SlipSize.avatarSmall - SlipSpacing.tiny
+    static let compactRosterRowHeight = SlipSize.avatarSmall + SlipSpacing.medium + SlipSpacing.micro
+    static let standardDividerInset = SlipSize.avatarSmall + SlipSpacing.standard + SlipSpacing.medium
+    static let compactDividerInset = compactAvatar + SlipSpacing.standard + SlipSpacing.medium
+    static let compactRankingRowHeight = SlipSize.avatarSmall + SlipSpacing.screen
     static let normalYesShare: CGFloat = 0.6
     static let normalNoShare: CGFloat = 0.4
     static let satOutYesShare: CGFloat = 0.75
@@ -662,15 +838,93 @@ private struct ResultRosterItem {
 
 private struct ResultRosterCard: View {
     let rows: [ResultRosterItem]
+    var usesCompactRows = false
+    var revealsOnAppear = false
+    var hapticOnOwnReveal = false
+    var showsVerdict = false
+    @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.slipAccessibility) private var accessibility
+    @State private var revealedRows: Set<Int> = []
+    @State private var revealTask: Task<Void, Never>?
+    @State private var deliveredOwnRevealHaptic = false
 
     var body: some View {
         SlipCard(padding: SlipSpacing.zero) {
             VStack(spacing: SlipSpacing.zero) {
                 ForEach(rows.indices, id: \.self) { index in
-                    ResultRosterRow(item: rows[index])
-                    if index != rows.indices.last { InsetDivider() }
+                    VStack(spacing: SlipSpacing.zero) {
+                        ResultRosterRow(
+                            item: rows[index],
+                            usesCompactLayout: usesCompactRows,
+                            showsVerdict: showsVerdict
+                        )
+                        if index != rows.indices.last {
+                            InsetDivider(inset: usesCompactRows
+                                ? ResultLayout.compactDividerInset
+                                : ResultLayout.standardDividerInset)
+                        }
+                    }
+                    .modifier(ResultRevealModifier(
+                        isRevealed: isRowRevealed(at: index),
+                        reduceMotion: shouldReduceMotion
+                    ))
                 }
             }
+        }
+        .onAppear {
+            beginRevealIfNeeded()
+        }
+        .onDisappear {
+            revealTask?.cancel()
+            revealTask = nil
+            revealedRows = RevealMotionPlan.completedRows(
+                afterCancelling: revealedRows,
+                participatingIndices: rows.indices.filter { rowParticipatesInReveal(at: $0) }
+            )
+        }
+    }
+
+    private var shouldReduceMotion: Bool {
+        reduceMotion || accessibility.reduceMotion
+    }
+
+    private func rowParticipatesInReveal(at index: Int) -> Bool {
+        revealsOnAppear && rows[index].value != nil
+    }
+
+    private func isRowRevealed(at index: Int) -> Bool {
+        !rowParticipatesInReveal(at: index) || model.isPreview || revealedRows.contains(index)
+    }
+
+    @MainActor private func beginRevealIfNeeded() {
+        guard revealsOnAppear, !model.isPreview, revealTask == nil, revealedRows.isEmpty else { return }
+        let animatedIndices = rows.indices.filter { rowParticipatesInReveal(at: $0) }
+        let animation: Animation = shouldReduceMotion
+            ? .easeOut(duration: SlipMotion.revealDuration)
+            : .spring(duration: SlipMotion.revealDuration, bounce: RevealMotionPlan.noBounce)
+
+        revealTask = Task { @MainActor in
+            var previousDelay = TimeInterval.zero
+            for index in animatedIndices {
+                let scheduledDelay = RevealMotionPlan.delay(forRowAt: index)
+                let incrementalDelay = scheduledDelay - previousDelay
+                if incrementalDelay > .zero {
+                    try? await Task.sleep(for: .seconds(incrementalDelay))
+                }
+                guard !Task.isCancelled else { return }
+
+                withAnimation(animation) {
+                    _ = revealedRows.insert(index)
+                }
+
+                if hapticOnOwnReveal, rows[index].name == "You", !deliveredOwnRevealHaptic {
+                    deliveredOwnRevealHaptic = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+                previousDelay = scheduledDelay
+            }
+            revealTask = nil
         }
     }
 }
@@ -678,12 +932,14 @@ private struct ResultRosterCard: View {
 private struct ResultRosterRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let item: ResultRosterItem
+    let usesCompactLayout: Bool
+    let showsVerdict: Bool
 
     var body: some View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 HStack(alignment: .top, spacing: SlipSpacing.medium) {
-                    InitialAvatar(name: item.name)
+                    InitialAvatar(name: item.name, size: avatarSize)
                     VStack(alignment: .leading, spacing: SlipSpacing.small) {
                         identity
                         trailing(isTrailing: false)
@@ -692,7 +948,7 @@ private struct ResultRosterRow: View {
                 }
             } else {
                 HStack(spacing: SlipSpacing.medium) {
-                    InitialAvatar(name: item.name)
+                    InitialAvatar(name: item.name, size: avatarSize)
                     identity
                     Spacer(minLength: SlipSpacing.small)
                     trailing(isTrailing: true)
@@ -701,9 +957,25 @@ private struct ResultRosterRow: View {
         }
         .foregroundStyle(SlipColor.ink)
         .padding(.horizontal, SlipSpacing.standard)
-        .padding(.vertical, SlipSpacing.medium)
-        .frame(minHeight: SlipSize.rosterRowHeight)
+        .padding(.vertical, rowVerticalPadding)
+        .frame(minHeight: rowMinimumHeight)
         .accessibilityElement(children: .combine)
+    }
+
+    private var usesCompactMetrics: Bool {
+        usesCompactLayout && !dynamicTypeSize.isAccessibilitySize
+    }
+
+    private var avatarSize: CGFloat {
+        usesCompactMetrics ? ResultLayout.compactAvatar : SlipSize.avatarSmall
+    }
+
+    private var rowVerticalPadding: CGFloat {
+        usesCompactMetrics ? SlipSpacing.small : SlipSpacing.medium
+    }
+
+    private var rowMinimumHeight: CGFloat {
+        usesCompactMetrics ? ResultLayout.compactRosterRowHeight : SlipSize.rosterRowHeight
     }
 
     private var identity: some View {
@@ -735,10 +1007,31 @@ private struct ResultRosterRow: View {
             if let score = item.score {
                 Text(score)
                     .font(SlipFont.bodyBold)
-                    .foregroundStyle(item.winner ? SlipColor.win : SlipColor.secondary)
+                    .foregroundStyle(showsVerdict && item.winner ? SlipColor.win : SlipColor.secondary)
                     .frame(minWidth: SlipSize.minimumTap, alignment: .trailing)
             }
         }
+    }
+}
+
+private struct ResultRevealModifier: ViewModifier {
+    let isRevealed: Bool
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        let state = RevealMotionPlan.visualState(isRevealed: isRevealed, reduceMotion: reduceMotion)
+        content
+            .opacity(state.opacity)
+            .accessibilityHidden(!isRevealed)
+            .rotation3DEffect(
+                .degrees(state.rotationDegrees),
+                axis: (
+                    x: RevealMotionPlan.axisX,
+                    y: RevealMotionPlan.axisY,
+                    z: RevealMotionPlan.axisZ
+                ),
+                perspective: RevealMotionPlan.perspective
+            )
     }
 }
 
@@ -756,7 +1049,7 @@ private struct ResultVerification: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: SlipSpacing.small) {
                 Text(headline)
-                    .font(emphasized ? SlipFont.headline : SlipFont.footnote)
+                    .font(emphasized ? SlipFont.subheadlineBold : SlipFont.footnote)
                     .foregroundStyle(emphasized ? SlipColor.ink : SlipColor.secondary)
                 if let detail {
                     Text(detail).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
@@ -786,6 +1079,43 @@ private struct ResultIconButton: View {
     }
 }
 
+private struct ResultStatusChip: View {
+    let text: String
+    var symbol = "clock"
+
+    var body: some View {
+        StatusChip(text: text, symbol: symbol)
+    }
+}
+
+private struct FixtureDisclosure: View {
+    var body: some View {
+        ResultStatusChip(text: "Preview only · no shared round", symbol: "eye")
+            .accessibilityLabel("Preview only. No shared round.")
+    }
+}
+
+private struct ResultBadge: View {
+    let title: String
+    let symbol: String
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
+
+    var body: some View {
+        Label(title, systemImage: symbol)
+            .font(SlipFont.subheadlineBold)
+            .foregroundStyle(SlipColor.ink)
+            .padding(.horizontal, SlipSpacing.standard)
+            .padding(.vertical, SlipSpacing.tiny)
+            .background(SlipColor.card, in: Capsule())
+            .overlay {
+                if contrast == .increased || accessibility.increaseContrast {
+                    Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.standard)
+                }
+            }
+    }
+}
+
 private struct VerdictBars: View {
     let satOut: Bool
 
@@ -793,36 +1123,59 @@ private struct VerdictBars: View {
         SlipCard {
             VStack(spacing: SlipSpacing.standard) {
                 VStack(spacing: SlipSpacing.small) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Yes").font(SlipFont.headline)
-                        Text("3 picks").font(SlipFont.body).foregroundStyle(SlipColor.secondary)
-                        Spacer()
-                        Text("called it").font(SlipFont.subheadlineBold).foregroundStyle(SlipColor.win)
-                    }
+                    VerdictBarHeading(side: "Yes", detail: "3 picks", calledIt: true)
                     ResultBar(value: satOut ? ResultLayout.satOutYesShare : ResultLayout.normalYesShare, color: SlipColor.win)
                         .accessibilityLabel("Yes")
                         .accessibilityValue("3 picks, called it")
                 }
 
                 VStack(spacing: SlipSpacing.small) {
-                    HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
-                        Text("No").font(SlipFont.headline)
-                        Text(satOut ? "1 pick · 1 sat out" : "2 picks")
-                            .font(SlipFont.body)
-                            .foregroundStyle(SlipColor.secondary)
-                        Spacer()
-                    }
+                    VerdictBarHeading(side: "No", detail: satOut ? "1 pick · 1 sat out" : "2 picks")
                     ResultBar(value: satOut ? ResultLayout.satOutNoShare : ResultLayout.normalNoShare, color: SlipColor.secondary)
                         .accessibilityLabel("No")
                         .accessibilityValue(satOut ? "1 pick, 1 sat out" : "2 picks")
                 }
             }
+            .padding(.vertical, SlipSpacing.small)
             .foregroundStyle(SlipColor.ink)
         }
     }
 }
 
+private struct VerdictBarHeading: View {
+    let side: String
+    let detail: String
+    var calledIt = false
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
+                labels
+                Spacer(minLength: SlipSpacing.small)
+                if calledIt { calledItLabel }
+            }
+            VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+                labels
+                if calledIt { calledItLabel }
+            }
+        }
+    }
+
+    private var labels: some View {
+        HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
+            Text(side).font(SlipFont.headline)
+            Text(detail).font(SlipFont.body).foregroundStyle(SlipColor.secondary)
+        }
+    }
+
+    private var calledItLabel: some View {
+        Text("called it").font(SlipFont.subheadlineBold).foregroundStyle(SlipColor.win)
+    }
+}
+
 private struct ResultBar: View {
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
     let value: CGFloat
     let color: Color
 
@@ -834,26 +1187,49 @@ private struct ResultBar: View {
             }
         }
         .frame(height: SlipSize.progressHeight)
+        .overlay {
+            if contrast == .increased || accessibility.increaseContrast {
+                Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.standard)
+            }
+        }
     }
 }
 
 private struct ResultCommentRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let name: String
     let text: String
     let reply: () -> Void
 
     var body: some View {
-        HStack(spacing: SlipSpacing.medium) {
-            InitialAvatar(name: name, size: SlipSize.avatarSmall)
-            Text(text).font(SlipFont.body).foregroundStyle(SlipColor.ink)
-            Spacer(minLength: SlipSpacing.small)
-            Button("Reply", action: reply)
-                .font(SlipFont.subheadlineBold)
-                .foregroundStyle(SlipColor.secondary)
-                .frame(minHeight: SlipSize.minimumTap)
-                .buttonStyle(.plain)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SlipSpacing.small) {
+                    HStack(alignment: .top, spacing: SlipSpacing.medium) {
+                        InitialAvatar(name: name, size: SlipSize.avatarSmall)
+                        Text(text).font(SlipFont.body).foregroundStyle(SlipColor.ink)
+                    }
+                    replyButton
+                        .padding(.leading, SlipSize.avatarSmall + SlipSpacing.medium)
+                }
+            } else {
+                HStack(spacing: SlipSpacing.medium) {
+                    InitialAvatar(name: name, size: SlipSize.avatarSmall)
+                    Text(text).font(SlipFont.body).foregroundStyle(SlipColor.ink)
+                    Spacer(minLength: SlipSpacing.small)
+                    replyButton
+                }
+            }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var replyButton: some View {
+        Button("Reply", action: reply)
+            .font(SlipFont.subheadlineBold)
+            .foregroundStyle(SlipColor.secondary)
+            .frame(minHeight: SlipSize.minimumTap)
+            .buttonStyle(.plain)
     }
 }
 
@@ -869,23 +1245,40 @@ private struct RankingItem {
 }
 
 private struct RankingRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let item: RankingItem
 
     var body: some View {
-        HStack(spacing: SlipSpacing.medium) {
-            Text(item.rank)
-                .font(SlipFont.body)
-                .foregroundStyle(SlipColor.secondary)
-                .frame(width: SlipSize.icon, alignment: .leading)
-            InitialAvatar(name: item.name)
-            Text(item.name).font(item.name == "You" ? SlipFont.headline : SlipFont.body)
-            Spacer(minLength: SlipSpacing.small)
-            Text(item.score).font(SlipFont.title3Bold)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                HStack(alignment: .top, spacing: SlipSpacing.medium) {
+                    InitialAvatar(name: item.name)
+                    VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+                        Text("Rank \(item.rank)").font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                        Text(item.name).font(item.name == "You" ? SlipFont.headline : SlipFont.body)
+                        Text("\(item.score) points").font(SlipFont.title3Bold)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                HStack(spacing: SlipSpacing.medium) {
+                    Text(item.rank)
+                        .font(SlipFont.body)
+                        .foregroundStyle(SlipColor.secondary)
+                        .frame(width: SlipSize.icon, alignment: .leading)
+                    InitialAvatar(name: item.name)
+                    Text(item.name).font(item.name == "You" ? SlipFont.headline : SlipFont.body)
+                    Spacer(minLength: SlipSpacing.small)
+                    Text(item.score).font(SlipFont.title3Bold)
+                }
+            }
         }
         .foregroundStyle(SlipColor.ink)
         .padding(.horizontal, SlipSpacing.screen)
-        .padding(.vertical, SlipSpacing.medium)
-        .frame(minHeight: SlipSize.rosterRowHeight)
+        .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? SlipSpacing.medium : SlipSpacing.small)
+        .frame(minHeight: dynamicTypeSize.isAccessibilitySize
+            ? SlipSize.rosterRowHeight
+            : ResultLayout.compactRankingRowHeight)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Rank \(item.rank), \(item.name), \(item.score) points")
     }
@@ -907,6 +1300,8 @@ private enum CallOutcome: Equatable, Sendable {
 private struct CallChoiceButton: View {
     let outcome: CallOutcome
     @Binding var selection: CallOutcome
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
 
     private var isSelected: Bool { selection == outcome }
 
@@ -922,6 +1317,12 @@ private struct CallChoiceButton: View {
             .foregroundStyle(isSelected ? SlipColor.background : SlipColor.secondary)
             .frame(maxWidth: .infinity, minHeight: SlipSpacing.stage)
             .background(isSelected ? SlipColor.ink : SlipColor.fill, in: RoundedRectangle(cornerRadius: SlipRadius.card))
+            .overlay {
+                if contrast == .increased || accessibility.increaseContrast {
+                    RoundedRectangle(cornerRadius: SlipRadius.card)
+                        .stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
         }
         .buttonStyle(.plain)
@@ -931,6 +1332,8 @@ private struct CallChoiceButton: View {
 
 private struct ChallengeReasonField: View {
     @Binding var text: String
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -951,6 +1354,12 @@ private struct ChallengeReasonField: View {
         }
         .frame(minHeight: SlipSize.noteFieldHeight)
         .background(SlipColor.fill, in: RoundedRectangle(cornerRadius: SlipRadius.control))
+        .overlay {
+            if contrast == .increased || accessibility.increaseContrast {
+                RoundedRectangle(cornerRadius: SlipRadius.control)
+                    .stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.standard)
+            }
+        }
     }
 }
 

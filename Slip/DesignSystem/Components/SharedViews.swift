@@ -42,13 +42,13 @@ struct ArtField: View {
                 : palette == 2 ? [SlipColor.artPurple, SlipColor.artPink, SlipColor.artGreen]
                 : [SlipColor.artPink, SlipColor.artYellow, SlipColor.artBlue]
             ZStack {
-                SlipColor.background
+                SlipColor.onSeal
                 RadialGradient(colors: [colors[0], SlipColor.clear], center: .topLeading,
                                startRadius: SlipSpacing.zero, endRadius: geometry.size.width)
                 RadialGradient(colors: [colors[1], SlipColor.clear], center: .topTrailing,
                                startRadius: SlipSpacing.zero, endRadius: geometry.size.width)
                 RadialGradient(colors: [colors[2], SlipColor.clear], center: .bottom,
-                               startRadius: SlipSpacing.zero, endRadius: geometry.size.width * SlipArt.radiusRatio)
+                               startRadius: SlipSpacing.zero, endRadius: geometry.size.height * SlipArt.radiusRatio)
             }
         }
     }
@@ -71,7 +71,7 @@ struct InitialAvatar: View {
     let name: String
     var size: CGFloat = SlipSize.avatarSmall
     var body: some View {
-        Text(PreviewContent.initial(name)).font(SlipFont.headline)
+        Text(PreviewContent.initial(name)).font(SlipFont.avatarInitial)
             .foregroundStyle(SlipColor.ink)
             .frame(width: size, height: size)
             .background(SlipColor.fill, in: Circle())
@@ -86,7 +86,7 @@ struct SealGlyph: View {
             .stroke(SlipColor.separator, style: StrokeStyle(lineWidth: SlipStroke.standard,
                     dash: sealed ? [] : SlipStroke.dashed))
             .overlay {
-                if sealed { Circle().fill(SlipColor.seal).frame(width: SlipSize.smallIcon, height: SlipSize.smallIcon) }
+                if sealed { Circle().fill(SlipColor.seal).frame(width: SlipSize.sealDot, height: SlipSize.sealDot) }
             }
             .frame(width: SlipSize.sealMark, height: SlipSize.sealMarkLarge)
             .accessibilityLabel(sealed ? "Sealed" : "Waiting")
@@ -99,6 +99,7 @@ struct PillButton: View {
     let title: String
     var tone: PillTone = .ink
     var icon: String? = nil
+    var compact = false
     var action: () -> Void
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.slipAccessibility) private var accessibility
@@ -117,12 +118,12 @@ struct PillButton: View {
                 Text(title).multilineTextAlignment(.center)
             }
             .font(SlipFont.headline).foregroundStyle(foreground)
-            .padding(.horizontal, SlipSpacing.screen).padding(.vertical, SlipSpacing.standard)
-            .frame(maxWidth: .infinity, minHeight: SlipSize.buttonHeight)
+            .padding(.horizontal, SlipSpacing.screen).padding(.vertical, SlipSpacing.medium)
+            .frame(maxWidth: .infinity, minHeight: compact ? SlipSize.compactButtonHeight : SlipSize.buttonHeight)
             .background(background, in: Capsule())
             .overlay { if contrast == .increased || accessibility.increaseContrast { Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis) } }
             .contentShape(Capsule())
-        }.buttonStyle(.plain)
+        }.buttonStyle(SlipPressStyle())
     }
 }
 
@@ -132,10 +133,10 @@ struct RoundButton: View {
     var action: () -> Void
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol).font(SlipFont.title2)
+            Image(systemName: symbol).font(SlipFont.chromeIcon)
                 .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
                 .foregroundStyle(SlipColor.ink).background(SlipColor.fill, in: Circle())
-        }.buttonStyle(.plain).accessibilityLabel(label)
+        }.buttonStyle(SlipPressStyle()).accessibilityLabel(label)
     }
 }
 
@@ -153,18 +154,55 @@ struct ScreenHeader: View {
 struct SheetHeading: View {
     let title: String
     var light = false
+    var sealIndicator = false
     @Environment(AppModel.self) private var model
     var body: some View {
         VStack(spacing: SlipSpacing.medium) {
             Capsule().fill((light ? SlipColor.onSeal : SlipColor.secondary).opacity(SlipOpacity.muted))
                 .frame(width: SlipSize.grabberWidth, height: SlipSize.grabberHeight)
-            Text(title).font(SlipFont.headline).foregroundStyle(light ? SlipColor.onSeal : SlipColor.ink)
+            HStack(spacing: SlipSpacing.small) {
+                if sealIndicator { Circle().fill(SlipColor.seal).frame(width: SlipSize.sealDot, height: SlipSize.sealDot).accessibilityHidden(true) }
+                Text(title).font(SlipFont.headline).foregroundStyle(light ? SlipColor.onSeal : SlipColor.ink)
+            }
         }.frame(maxWidth: .infinity).padding(.top, SlipSpacing.small)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: SlipSpacing.screen).onEnded { value in
                 if value.translation.height > SlipSpacing.hero { model.back() }
             })
             .accessibilityAction(named: "Dismiss") { model.back() }
+    }
+}
+
+/// Keeps a cancel control and centered form title separate as text grows.
+struct FormHeading: View {
+    let title: String
+    var cancel: () -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: SlipSpacing.small) {
+                    cancelButton
+                    heading.frame(maxWidth: .infinity, alignment: .center)
+                }
+            } else {
+                ZStack {
+                    heading
+                    HStack { cancelButton; Spacer(minLength: SlipSpacing.zero) }
+                }
+            }
+        }.frame(maxWidth: .infinity)
+    }
+
+    private var heading: some View {
+        Text(title).font(SlipFont.headline).foregroundStyle(SlipColor.ink)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var cancelButton: some View {
+        Button("Cancel", action: cancel).font(SlipFont.body)
+            .foregroundStyle(SlipColor.secondary).frame(minHeight: SlipSize.minimumTap)
     }
 }
 
@@ -177,7 +215,7 @@ struct ContextRow: View {
         HStack(spacing: SlipSpacing.medium) {
             if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.artSmall) }
             VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-                Text(model.sampleQuestion).font(SlipFont.headline)
+                Text(model.sampleQuestion).font(SlipFont.headline).fixedSize(horizontal: false, vertical: true)
                 Text(detail).font(SlipFont.footnote).foregroundStyle(light ? SlipColor.onTicket : SlipColor.secondary)
             }
         }.foregroundStyle(light ? SlipColor.onSeal : SlipColor.ink)
@@ -197,8 +235,8 @@ struct MemberRow: View {
         HStack(spacing: SlipSpacing.medium) {
             InitialAvatar(name: name)
             VStack(alignment: .leading, spacing: SlipSpacing.micro) {
-                Text(name).font(name == "You" ? SlipFont.headline : SlipFont.body)
-                if let detail { Text(detail).font(SlipFont.caption).foregroundStyle(SlipColor.secondary) }
+                Text(name).font(name == "You" ? SlipFont.headline : SlipFont.body).fixedSize(horizontal: false, vertical: true)
+                if let detail { Text(detail).font(SlipFont.caption).foregroundStyle(SlipColor.secondary).fixedSize(horizontal: false, vertical: true) }
             }
             Spacer(minLength: SlipSpacing.small)
             if let value {
@@ -223,21 +261,45 @@ struct InsetDivider: View {
 }
 
 struct StatusChip: View {
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
     let text: String
     var symbol = "clock"
     var body: some View {
-        Label(text, systemImage: symbol).font(SlipFont.subheadlineBold)
+        Label {
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: symbol)
+        }.font(SlipFont.subheadlineBold)
             .foregroundStyle(SlipColor.ink).padding(.horizontal, SlipSpacing.standard)
             .padding(.vertical, SlipSpacing.medium).background(SlipColor.fill, in: Capsule())
+            .overlay { if contrast == .increased || accessibility.increaseContrast {
+                Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.standard)
+            } }
+    }
+}
+
+struct SlipPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.slipAccessibility) private var accessibility
+
+    func makeBody(configuration: Configuration) -> some View {
+        let motionReduced = reduceMotion || accessibility.reduceMotion
+        configuration.label
+            .scaleEffect(configuration.isPressed && !motionReduced ? SlipMotion.pressScale : SlipOpacity.opaque)
+            .opacity(configuration.isPressed && motionReduced ? SlipOpacity.strong : SlipOpacity.opaque)
+            .animation(.easeOut(duration: SlipMotion.pressDuration), value: configuration.isPressed)
     }
 }
 
 struct BottomActions<Content: View>: View {
+    var background: Color = SlipColor.background
     @ViewBuilder var content: Content
     var body: some View {
         VStack(spacing: SlipSpacing.medium) { content }
             .padding(.horizontal, SlipSpacing.screen).padding(.top, SlipSpacing.standard)
             .padding(.bottom, SlipSpacing.standard)
+            .background(background.ignoresSafeArea(edges: .bottom))
     }
 }
 
@@ -245,4 +307,13 @@ enum SlipArt {
     static let cornerDivisor: CGFloat = 4
     static let radiusRatio: CGFloat = 0.8
     static let backdropHeight: CGFloat = 360
+}
+
+enum SlipDateText {
+    static func weekdayTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.dateFormat = "EEEE HH:mm"
+        return formatter.string(from: date)
+    }
 }

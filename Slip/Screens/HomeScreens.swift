@@ -9,7 +9,7 @@ struct HomeScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: SlipSpacing.section) {
+            VStack(alignment: .leading, spacing: SlipSpacing.standard) {
                 header
 
                 if firstRun {
@@ -39,7 +39,7 @@ struct HomeScreen: View {
                 model.go(.you)
             } label: {
                 Text("S")
-                    .font(SlipFont.headline)
+                    .font(SlipFont.avatarInitial)
                     .foregroundStyle(SlipColor.ink)
                     .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
                     .background(SlipColor.fill, in: Circle())
@@ -85,7 +85,7 @@ struct HomeScreen: View {
 
     private var emptyState: some View {
         VStack(spacing: SlipSpacing.large) {
-            Spacer(minLength: typeSize.isAccessibilitySize ? SlipSpacing.large : SlipSpacing.stage)
+            Spacer(minLength: typeSize.isAccessibilitySize ? SlipSpacing.large : SlipSpacing.hero)
 
             EmptyPickStack()
                 .padding(.bottom, SlipSpacing.large)
@@ -95,7 +95,7 @@ struct HomeScreen: View {
                 .foregroundStyle(SlipColor.ink)
 
             Text("Ask your crew something. Everyone seals a pick, then you open together.")
-                .font(SlipFont.body)
+                .font(SlipFont.subheadline)
                 .foregroundStyle(SlipColor.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: HomeMetrics.emptyCopyWidth)
@@ -108,7 +108,7 @@ struct HomeScreen: View {
                 model.go(.invite)
             } label: {
                 Text("Have an invite link? Tap it and you’re in.")
-                    .font(SlipFont.subheadline)
+                    .font(SlipFont.footnote)
                     .foregroundStyle(SlipColor.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity, minHeight: SlipSize.minimumTap)
@@ -132,21 +132,28 @@ private enum HomeFeedSelection: String, CaseIterable, Identifiable {
 private struct HomeFeedPicker: View {
     @Binding var selection: HomeFeedSelection
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        HStack(spacing: SlipSpacing.small) {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: SlipSpacing.small))
+            : AnyLayout(HStackLayout(spacing: SlipSpacing.small))
+        layout {
             ForEach(HomeFeedSelection.allCases) { item in
                 Button {
                     selection = item
                 } label: {
                     Text(item.rawValue)
                         .font(SlipFont.headline)
+                        .fixedSize(horizontal: false, vertical: true)
                         .foregroundStyle(selection == item ? selectedForeground : SlipColor.secondary)
                         .padding(.horizontal, SlipSpacing.screen)
+                        .padding(.vertical, typeSize.isAccessibilitySize ? SlipSpacing.small : SlipSpacing.zero)
+                        .frame(maxWidth: typeSize.isAccessibilitySize ? .infinity : nil)
                         .frame(minHeight: SlipSize.segmentHeight)
                         .background(selection == item ? selectedBackground : SlipColor.fill, in: Capsule())
                         .overlay {
-                            if contrast == .increased {
+                            if contrast == .increased || accessibility.increaseContrast {
                                 Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.standard)
                             }
                         }
@@ -170,17 +177,19 @@ private struct HomeHeroCard: View {
     var body: some View {
         SlipCard(padding: SlipSpacing.zero) {
             VStack(alignment: .leading, spacing: SlipSpacing.zero) {
-                ArtField()
-                    .frame(height: SlipSize.heroBannerHeight)
-                    .overlay(alignment: .topLeading) {
-                        Label("Seal by Fri 20:00", systemImage: "clock")
+                Label {
+                    Text("Seal by Fri 20:00").fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "clock")
+                }
                             .font(SlipFont.subheadlineBold)
                             .foregroundStyle(SlipColor.ticket)
                             .padding(.horizontal, SlipSpacing.standard)
                             .padding(.vertical, SlipSpacing.medium)
                             .background(SlipColor.onSeal, in: Capsule())
                             .padding(SlipSpacing.medium)
-                    }
+                            .frame(maxWidth: .infinity, minHeight: SlipSize.heroBannerHeight, alignment: .topLeading)
+                            .background { ArtField() }
 
                 VStack(alignment: .leading, spacing: SlipSpacing.medium) {
                     Text(model.sampleQuestion)
@@ -192,7 +201,7 @@ private struct HomeHeroCard: View {
                         .font(SlipFont.subheadline)
                         .foregroundStyle(SlipColor.secondary)
 
-                    PillButton(title: "Seal your pick", tone: .seal, action: action)
+                    PillButton(title: "Seal your pick", tone: .seal, compact: true, action: action)
                 }
                 .padding(SlipSpacing.standard)
             }
@@ -204,9 +213,12 @@ private struct HomeHeroCard: View {
 private struct HomeDayHeading: View {
     let day: String
     let state: String
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.small))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SlipSpacing.small))
+        layout {
             Text(day).font(SlipFont.title2).foregroundStyle(SlipColor.ink)
             Text(state).font(SlipFont.title3).foregroundStyle(SlipColor.secondary)
         }
@@ -220,6 +232,7 @@ private enum HomeRowState {
 }
 
 private struct HomeCompactSlipRow: View {
+    @Environment(\.dynamicTypeSize) private var typeSize
     let question: String
     let detail: String
     let palette: Int
@@ -229,8 +242,10 @@ private struct HomeCompactSlipRow: View {
     var body: some View {
         Button(action: action) {
             SlipCard {
-                HStack(spacing: SlipSpacing.medium) {
-                    CrewArt(size: SlipSize.art, palette: palette)
+                let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.medium))
+                    : AnyLayout(HStackLayout(spacing: SlipSpacing.medium))
+                layout {
+                    if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.art, palette: palette) }
                     VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
                         Text(question)
                             .font(SlipFont.headline)
@@ -241,7 +256,7 @@ private struct HomeCompactSlipRow: View {
                             .foregroundStyle(SlipColor.secondary)
                             .multilineTextAlignment(.leading)
                     }
-                    Spacer(minLength: SlipSpacing.small)
+                    if !typeSize.isAccessibilitySize { Spacer(minLength: SlipSpacing.small) }
                     switch state {
                     case .sealed:
                         SealGlyph()
@@ -269,11 +284,11 @@ private struct EmptyPickStack: View {
                 .offset(y: SlipSpacing.small)
             VStack(spacing: SlipSpacing.medium) {
                 Text("Your pick")
-                    .font(SlipFont.subheadlineBold)
+                    .font(SlipFont.artworkCaption)
                     .foregroundStyle(SlipColor.secondary)
                 Circle()
                     .fill(SlipColor.seal)
-                    .frame(width: SlipSize.sealDisc, height: SlipSize.sealDisc)
+                    .frame(width: SlipSize.sealMark, height: SlipSize.sealMark)
             }
             .frame(width: HomeMetrics.emptyCardWidth, height: HomeMetrics.emptyCardHeight)
             .background(SlipColor.card, in: RoundedRectangle(cornerRadius: SlipRadius.card))
@@ -338,6 +353,7 @@ struct HowItWorksScreen: View {
                         .padding(.vertical, SlipSpacing.small)
                     }
                     .scrollIndicators(.hidden)
+                    .scrollClipDisabled()
                 }
             }
             .padding(.horizontal, SlipSpacing.screen)

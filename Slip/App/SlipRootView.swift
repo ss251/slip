@@ -1,17 +1,32 @@
 import SwiftUI
 
+extension SlipScreen {
+    var usesDarkCanvas: Bool {
+        [.seal, .sealing, .proofFailed, .alreadySealed, .ticket, .postingLater].contains(self)
+    }
+}
+
 struct SlipRootView: View {
     @Bindable var model: AppModel
     let flow: SealFlowModel
     @Environment(\.scenePhase) private var scenePhase
+    @State private var chromeHeight = SlipChrome.scrollClearance
 
     var body: some View {
         screenContent
             .font(SlipFont.body).foregroundStyle(SlipColor.ink)
             .background(SlipColor.background.ignoresSafeArea())
-            .safeAreaInset(edge: .bottom, spacing: SlipSpacing.zero) {
-                if model.screen.hasTabs { GlassTabBar() }
+            .contentMargins(.bottom, model.screen.hasTabs ? chromeHeight + SlipSpacing.small : SlipSpacing.zero, for: .scrollContent)
+            .overlay(alignment: .bottom) {
+                if model.screen.hasTabs {
+                    GlassTabBar().background {
+                        GeometryReader { geometry in
+                            SlipColor.clear.preference(key: ChromeHeightKey.self, value: geometry.size.height)
+                        }
+                    }
+                }
             }
+            .onPreferenceChange(ChromeHeightKey.self) { chromeHeight = $0 }
             .environment(model).environment(flow)
             .overlay {
                 // Conceal private UI before the app switcher captures an inactive scene.
@@ -50,6 +65,11 @@ struct SlipRootView: View {
         case .voided: VoidedScreen()
         }
     }
+}
+
+private struct ChromeHeightKey: PreferenceKey {
+    static let defaultValue = SlipSpacing.zero
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 #Preview("Slips") {

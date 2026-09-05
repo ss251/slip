@@ -10,7 +10,7 @@ struct ScreenSnapshotTests {
     private static let directory = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().appendingPathComponent("Snapshots")
 
-    @Test("Every screen matches its reviewed light, dark and XL snapshots")
+    @Test("Every screen matches its reviewed light, dark, XL and accessibility snapshots")
     func allScreens() async throws {
         let record = ProcessInfo.processInfo.environment["SLIP_RECORD_SNAPSHOTS"] == "1"
         for screen in SlipScreen.allCases {
@@ -39,17 +39,43 @@ struct ScreenSnapshotTests {
         }
     }
 
+    @Test("Machine receipts use the bundled JetBrains Mono face")
+    func machineFontIsRegistered() throws {
+        #expect(UIFont(name: "JetBrainsMono-Regular", size: 12) != nil)
+    }
+
+    @Test("Small white seal copy has AA contrast on the rendered art wash")
+    func sealCanvasContrast() async throws {
+        let image = try await drawHierarchyInKeyWindow(screen: .seal, variant: .light)
+        let cg = try #require(image.cgImage)
+        let rgba = try pixels(image)
+        func luminance(_ components: [Double]) -> Double {
+            let linear = components.map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
+            return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722
+        }
+        let foreground = luminance([242.0 / 255, 242.0 / 255, 247.0 / 255])
+        var minimumRatio = Double.infinity
+        // Left canvas gutter avoids all private/synthetic pick text and controls.
+        for y in stride(from: 160, to: cg.height - 100, by: 20) {
+            let offset = (y * cg.width + 4) * 4
+            let background = luminance((0..<3).map { Double(rgba[offset + $0]) / 255 })
+            minimumRatio = min(minimumRatio, (foreground + 0.05) / (background + 0.05))
+        }
+        #expect(minimumRatio >= 4.5, "Rendered seal canvas contrast: \(minimumRatio):1")
+    }
+
     private func drawHierarchyInKeyWindow(screen: SlipScreen, variant: SnapshotVariant) async throws -> UIImage {
         let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previous = scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene: scene)
-        let size = CGSize(width: 393, height: variant == .accessibility ? 1100 : 852)
+        let isAccessibility = variant == .accessibility || variant == .accessibilityMax
+        let size = CGSize(width: 393, height: isAccessibility ? 1100 : 852)
         window.frame = CGRect(origin: .zero, size: size)
         let root = SlipRootView(model: .preview(screen), flow: SealFlowModel())
             .environment(\.colorScheme, variant == .dark ? .dark : .light)
-            .environment(\.dynamicTypeSize, variant == .xl ? .xLarge : variant == .accessibility ? .accessibility1 : .large)
+            .environment(\.dynamicTypeSize, variant == .xl ? .xLarge : variant == .accessibility ? .accessibility1 : variant == .accessibilityMax ? .accessibility5 : .large)
             .environment(\.slipAccessibility, AccessibilityOverrides(reduceMotion: true,
-                reduceTransparency: true, increaseContrast: variant == .accessibility))
+                reduceTransparency: true, increaseContrast: isAccessibility))
         let host = UIHostingController(rootView: root)
         host.overrideUserInterfaceStyle = variant == .dark ? .dark : .light
         window.rootViewController = host
@@ -91,6 +117,6 @@ struct ScreenSnapshotTests {
 }
 
 private enum SnapshotVariant: String, CaseIterable {
-    case light, dark, xl, accessibility
-    static let allCases: [SnapshotVariant] = [.light, .dark, .xl]
+    case light, dark, xl, accessibility, accessibilityMax
+    static let allCases: [SnapshotVariant] = [.light, .dark, .xl, .accessibility, .accessibilityMax]
 }
