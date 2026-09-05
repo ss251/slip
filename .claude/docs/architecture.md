@@ -268,10 +268,13 @@ needed by the wallet. This is sensitive wallet-handoff data even though it conta
 witness. The authenticated developer relay deserializes it, admits exactly one
 guaranteed effect-free `sealPick` call to one configured contract, adds only DUST,
 signs/finalizes with the undeployed genesis wallet and submits the finalized
-transaction to the node. Its confirmation endpoint reads only current public contract
-state through the indexer. The relay never receives the private runtime `proofData`,
-and neither request bodies, proof bytes, tokens, keys nor internal errors are logged or
-echoed.
+transaction to the node. The submit response stops when the pinned node client emits
+`Submitted`; inclusion, finality and contract success remain behind the confirmation
+endpoint, which reads only current public contract state through the indexer. The relay
+never receives the private runtime `proofData`, and its request path never logs or
+echoes request bodies, proof bytes, tokens, keys or internal errors. The separate
+operator-only serve mode prints a one-time setup token and bounded diagnostics to its
+trusted local terminal.
 
 Every work endpoint requires a fresh 32-byte bearer token. The server binds loopback by
 default; non-loopback binding needs an explicit opt-in and plain HTTP is limited to a
@@ -285,9 +288,13 @@ Evidence remains deliberately split. A physical iPhone component test assembled 
 proved against embedded post-create state, but used a stub relay with no HTTP, wallet,
 node or indexer. Separately, `scripts/phase7-live-relay-demo.mjs` exercised the real
 authenticated HTTP steward against the undeployed node and required `SucceedEntirely`
-plus exact indexed commitment equality, but its producer was the host. The current
-Swift HTTP client still needs the required bearer-token wiring before one run can prove
-the combined physical-iPhone → relay → devnet path. Sources and limits:
+plus exact indexed commitment equality, but its producer was the host. An authenticated
+iPhone Simulator seal subsequently reached the relay and landed in indexed state; its
+pre-fix HTTP response timed out only because the relay waited for finality. The relay now
+returns at `Submitted`, and the DEBUG client can carry the bearer token, but this remains
+simulator rather than physical-iPhone evidence. Relay pending state and idempotency
+tombstones are in memory, so the developer relay must stay alive from `Submitted`
+through indexed resolution or TTL expiry. Sources and limits:
 `docs/phase6-sources.md` and `docs/phase7-sources.md`.
 
 ### App-only local proving demonstration (September 2026)

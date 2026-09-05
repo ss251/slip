@@ -26,6 +26,7 @@ export const MAX_SEAL_TTL_SECONDS = 3_600;
 export const MAX_CACHED_SUBMISSIONS = 1_024;
 export const MAX_ACTIVE_SUBMISSIONS = 8;
 export const MAX_SUBMISSIONS_PER_MINUTE = 12;
+export const MAX_TRANSACTION_ID_CHARACTERS = 512;
 export const SUBMISSION_CACHE_MILLISECONDS = (MAX_SEAL_TTL_SECONDS + 5 * 60) * 1_000;
 export const READ_TIMEOUT_MILLISECONDS = 10_000;
 
@@ -283,7 +284,8 @@ export function createRelayServer({
         const body = await readBoundedBody(request, configuration.maxBodyBytes ?? MAX_BODY_BYTES);
         if (body.length === 0) requestError(400, 'empty_payload');
         const txId = await submit(body);
-        if (typeof txId !== 'string' || txId.length === 0 || txId.length > 512) {
+        if (typeof txId !== 'string' || txId.length === 0
+            || txId.length > MAX_TRANSACTION_ID_CHARACTERS) {
           throw new Error('submitter returned invalid transaction id');
         }
         sendJSON(response, 200, { txId });
@@ -567,7 +569,7 @@ export function createSubmissionCoordinator({
           entry.prepared = undefined;
           if (entry.retry && !submissionWasExplicitlyRejected(error)) {
             // Retry only the identical finalized transaction. Never rebalance an
-            // ambiguous submission or let another job select its released DUST.
+            // ambiguous submission or let another job contend for its booked DUST.
             if (entry.attempts < maximumSubmitAttempts) {
               entry.state = 'retryable';
             } else {
@@ -739,7 +741,41 @@ export async function balanceSignFinalizeSubmit({
     }
     throw error;
   }
-  const submitFinalized = () => wallet.submitTransaction(finalized);
+  // The facade's submitTransaction hard-codes a Finalized wait. Finalization above
+  // already booked this transaction and its DUST; the pending service independently
+  // reconciles the indexed outcome after this Submitted event lets HTTP return.
+  // Ambiguous errors before observing Submitted retain that booking for exact retry.
+  // Only explicit node rejection proves it is safe to release the finalized transaction.
+  let txId;
+  try {
+    txId = finalized.identifiers().at(-1);
+    if (typeof txId !== 'string' || txId.length === 0
+        || txId.length > MAX_TRANSACTION_ID_CHARACTERS) {
+      throw new Error('finalized transaction has no valid identifier');
+    }
+  } catch (error) {
+    try {
+      await wallet.revert(finalized);
+    } catch (revertError) {
+      throw new AggregateError([error, revertError], 'wallet identifier and rollback failed');
+    }
+    throw error;
+  }
+  const submitFinalized = async () => {
+    try {
+      await wallet.submissionService.submitTransaction(finalized, 'Submitted');
+      return txId;
+    } catch (error) {
+      if (submissionWasExplicitlyRejected(error)) {
+        try {
+          await wallet.revert(finalized);
+        } catch (revertError) {
+          throw new AggregateError([error, revertError], 'wallet submission and rollback failed');
+        }
+      }
+      throw error;
+    }
+  };
   setSubmissionRetry(submitFinalized);
   return submitFinalized();
 }

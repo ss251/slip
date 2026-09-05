@@ -429,6 +429,7 @@ test('wallet handoff balances DUST only, then signs, finalizes, and submits in o
   let retryOperation;
   const ttl = new Date('2026-09-05T14:30:00.000Z');
   const transaction = { stage: 'proved-pre-binding' };
+  const finalized = { identifiers: () => ['tx-id'] };
   const zswap = { key: 'shielded' };
   const dust = { key: 'dust' };
   const wallet = {
@@ -437,8 +438,13 @@ test('wallet handoff balances DUST only, then signs, finalizes, and submits in o
       calls.push(['sign', recipe, signer(Uint8Array.of(7))]);
       return 'signed';
     },
-    finalizeRecipe: async (recipe) => { calls.push(['finalize', recipe]); return 'finalized'; },
-    submitTransaction: async (tx) => { calls.push(['submit', tx]); return 'tx-id'; },
+    finalizeRecipe: async (recipe) => { calls.push(['finalize', recipe]); return finalized; },
+    submissionService: {
+      submitTransaction: async (tx, waitFor) => {
+        calls.push(['submit', tx, waitFor]);
+        return { _tag: 'Submitted', txHash: 'node-extrinsic-hash' };
+      },
+    },
     revert: async (value) => { calls.push(['revert', value]); },
   };
   const keystore = { signData: (payload) => `signature-${payload[0]}` };
@@ -462,10 +468,10 @@ test('wallet handoff balances DUST only, then signs, finalizes, and submits in o
     ['sign', 'recipe', 'signature-7'],
     ['finalize', 'signed'],
     ['submission-ready'],
-    ['submit', 'finalized'],
+    ['submit', finalized, 'Submitted'],
   ]);
   assert.equal(await retryOperation(), 'tx-id');
-  assert.deepEqual(calls.at(-1), ['submit', 'finalized']);
+  assert.deepEqual(calls.at(-1), ['submit', finalized, 'Submitted']);
 });
 
 test('wallet preparation failure rolls back the selected recipe before retry', async () => {
@@ -484,6 +490,173 @@ test('wallet preparation failure rolls back the selected recipe before retry', a
     ttl: new Date(),
   }), /signing failed/);
   assert.deepEqual(calls, [['revert', 'recipe']]);
+});
+
+test('invalid finalized transaction identifiers roll back before node submission', async () => {
+  const identifierCases = [
+    () => { throw new Error('identifier unavailable'); },
+    () => [],
+  ];
+  for (const identifiers of identifierCases) {
+    const finalized = { identifiers };
+    const reverted = [];
+    let submissions = 0;
+    const wallet = {
+      balanceUnboundTransaction: async () => 'recipe',
+      signRecipe: async () => 'signed',
+      finalizeRecipe: async () => finalized,
+      submissionService: {
+        submitTransaction: async () => { submissions += 1; },
+      },
+      revert: async (value) => { reverted.push(value); },
+    };
+    await assert.rejects(balanceSignFinalizeSubmit({
+      wallet,
+      zswap: {},
+      dust: {},
+      keystore: { signData: () => 'signature' },
+      transaction: {},
+      ttl: new Date('2026-09-05T17:00:00.000Z'),
+    }));
+    assert.equal(submissions, 0);
+    assert.deepEqual(reverted, [finalized]);
+  }
+});
+
+test('submit returns on node acceptance while confirmation remains pending until indexed', async (t) => {
+  const commitment = Buffer.alloc(32, 9);
+  const finalized = { identifiers: () => ['accepted-transaction-id'] };
+  const submissions = [];
+  let indexedSeals = [];
+  let releaseFinality;
+  let finalitySettled = false;
+  const slowFinality = new Promise((resolve) => { releaseFinality = resolve; });
+  slowFinality.then(() => { finalitySettled = true; });
+  const wallet = {
+    balanceUnboundTransaction: async () => 'recipe',
+    signRecipe: async () => 'signed',
+    finalizeRecipe: async () => finalized,
+    submissionService: {
+      submitTransaction: async (tx, waitFor) => {
+        submissions.push([tx, waitFor]);
+        if (waitFor === 'Finalized') return slowFinality;
+        return { _tag: 'Submitted', txHash: 'different-node-extrinsic-hash' };
+      },
+    },
+    // This is the old facade path: it deliberately cannot resolve until finality.
+    submitTransaction: async (tx) => {
+      await wallet.submissionService.submitTransaction(tx, 'Finalized');
+      return tx.identifiers().at(-1);
+    },
+    revert: async () => {},
+  };
+  const fixture = await startServer({
+    submit: async () => balanceSignFinalizeSubmit({
+      wallet,
+      zswap: {},
+      dust: {},
+      keystore: { signData: () => 'signature' },
+      transaction: {},
+      ttl: new Date('2026-09-05T17:00:00.000Z'),
+    }),
+    confirm: async (commitmentHex) => (
+      stateContainsCommitment(indexedSeals, commitmentHex) ? 'confirmed' : 'pending'
+    ),
+  });
+  t.after(() => fixture.close());
+
+  let responseDeadline;
+  const deadline = new Promise((_, reject) => {
+    responseDeadline = setTimeout(() => reject(new Error('submit waited for finality')), 2_000);
+  });
+  let accepted;
+  try {
+    accepted = await Promise.race([
+      fetchJSON(fixture.baseURL, '/submit', {
+        method: 'POST',
+        headers: { ...authorization, 'content-type': 'application/octet-stream' },
+        body: Buffer.of(1),
+      }),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(responseDeadline);
+  }
+  assert.equal(accepted.response.status, 200);
+  assert.deepEqual(accepted.body, { txId: 'accepted-transaction-id' });
+  assert.deepEqual(submissions, [[finalized, 'Submitted']]);
+  assert.equal(finalitySettled, false);
+
+  const pending = await fetchJSON(fixture.baseURL, `/confirm/${commitment.toString('hex')}`, {
+    headers: authorization,
+  });
+  assert.deepEqual(pending.body, { status: 'pending' });
+
+  indexedSeals = [[Buffer.alloc(32, 1), commitment]];
+  const confirmed = await fetchJSON(fixture.baseURL, `/confirm/${commitment.toString('hex')}`, {
+    headers: authorization,
+  });
+  assert.deepEqual(confirmed.body, { status: 'confirmed' });
+  assert.equal(finalitySettled, false);
+  releaseFinality();
+  await slowFinality;
+});
+
+test('error before observing Submitted stays an HTTP error and only explicit rejection rolls back', async (t) => {
+  const finalized = { identifiers: () => ['never-accepted'] };
+  const reverted = [];
+  const wallet = {
+    balanceUnboundTransaction: async () => 'recipe',
+    signRecipe: async () => 'signed',
+    finalizeRecipe: async () => finalized,
+    submissionService: {
+      submitTransaction: async (_tx, waitFor) => {
+        assert.equal(waitFor, 'Submitted');
+        throw new Error('node submission failed');
+      },
+    },
+    revert: async (value) => { reverted.push(value); },
+  };
+  const fixture = await startServer({
+    submit: async () => balanceSignFinalizeSubmit({
+      wallet,
+      zswap: {},
+      dust: {},
+      keystore: { signData: () => 'signature' },
+      transaction: {},
+      ttl: new Date('2026-09-05T17:00:00.000Z'),
+    }),
+  });
+  t.after(() => fixture.close());
+
+  const response = await fetchJSON(fixture.baseURL, '/submit', {
+    method: 'POST',
+    headers: { ...authorization, 'content-type': 'application/octet-stream' },
+    body: Buffer.of(1),
+  });
+  assert.equal(response.response.status, 500);
+  assert.deepEqual(response.body, { error: 'internal_error' });
+  assert.deepEqual(reverted, []);
+
+  const invalid = Object.assign(new Error('explicitly invalid'), { _tag: 'TransactionInvalidError' });
+  const explicitlyRejected = { identifiers: () => ['explicitly-rejected'] };
+  const explicitReverts = [];
+  const explicitWallet = {
+    balanceUnboundTransaction: async () => 'explicit-recipe',
+    signRecipe: async () => 'explicit-signed',
+    finalizeRecipe: async () => explicitlyRejected,
+    submissionService: { submitTransaction: async () => { throw invalid; } },
+    revert: async (value) => { explicitReverts.push(value); },
+  };
+  await assert.rejects(balanceSignFinalizeSubmit({
+    wallet: explicitWallet,
+    zswap: {},
+    dust: {},
+    keystore: { signData: () => 'signature' },
+    transaction: {},
+    ttl: new Date('2026-09-05T17:00:00.000Z'),
+  }), (error) => error === invalid);
+  assert.deepEqual(explicitReverts, [explicitlyRejected]);
 });
 
 test('submission coordinator zeroes inputs, deduplicates bytes, and serializes wallet work', async () => {
@@ -624,18 +797,47 @@ test('an ambiguous submission retries the same finalized operation without prepa
   assert.equal(coordinator.cacheSize(), 1);
 });
 
-test('an ambiguous wallet result freezes already queued work until exact retry resolves', async () => {
+test('an ambiguous wallet result retains DUST and freezes queued work until exact retry resolves', async () => {
+  const balanced = [];
+  const finalizedByValue = new Map();
   const submitted = [];
-  const coordinator = createSubmissionCoordinator({
-    prepare: (bytes) => bytes[0],
-    submitPrepared: async (value, lifecycle) => {
-      submitted.push(value);
-      if (value === 1) {
-        lifecycle.setSubmissionRetry(async () => 'first-accepted-on-retry');
-        throw new Error('first outcome unknown');
-      }
-      return 'second-must-not-run';
+  const reverted = [];
+  let firstAttempt = true;
+  const wallet = {
+    balanceUnboundTransaction: async (transaction) => {
+      balanced.push(transaction.value);
+      return { value: transaction.value };
     },
+    signRecipe: async (recipe) => recipe,
+    finalizeRecipe: async (recipe) => {
+      const finalized = { value: recipe.value, identifiers: () => [`tx-${recipe.value}`] };
+      finalizedByValue.set(recipe.value, finalized);
+      return finalized;
+    },
+    submissionService: {
+      submitTransaction: async (finalized, waitFor) => {
+        assert.equal(waitFor, 'Submitted');
+        submitted.push(finalized);
+        if (finalized.value === 1 && firstAttempt) {
+          firstAttempt = false;
+          throw new Error('first outcome unknown');
+        }
+        return { _tag: 'Submitted' };
+      },
+    },
+    revert: async (value) => { reverted.push(value); },
+  };
+  const coordinator = createSubmissionCoordinator({
+    prepare: (bytes) => ({ value: bytes[0] }),
+    submitPrepared: async (transaction, lifecycle) => balanceSignFinalizeSubmit({
+      wallet,
+      zswap: {},
+      dust: {},
+      keystore: { signData: () => 'signature' },
+      transaction,
+      ttl: new Date('2026-09-05T17:00:00.000Z'),
+      setSubmissionRetry: lifecycle.setSubmissionRetry,
+    }),
   });
   const first = coordinator.submit(Buffer.of(1));
   const alreadyQueued = coordinator.submit(Buffer.of(2));
@@ -644,10 +846,15 @@ test('an ambiguous wallet result freezes already queued work until exact retry r
     alreadyQueued,
     (error) => error instanceof RelayRequestError && error.code === 'submission_uncertain',
   );
-  assert.deepEqual(submitted, [1]);
-  assert.equal(await coordinator.submit(Buffer.of(1)), 'first-accepted-on-retry');
-  assert.equal(await coordinator.submit(Buffer.of(2)), 'second-must-not-run');
-  assert.deepEqual(submitted, [1, 2]);
+  const firstFinalized = finalizedByValue.get(1);
+  assert.deepEqual(submitted, [firstFinalized]);
+  assert.deepEqual(reverted, []);
+  assert.equal(await coordinator.submit(Buffer.of(1)), 'tx-1');
+  assert.equal(submitted[1], firstFinalized);
+  assert.deepEqual(balanced, [1]);
+  assert.equal(await coordinator.submit(Buffer.of(2)), 'tx-2');
+  assert.deepEqual(balanced, [1, 2]);
+  assert.deepEqual(reverted, []);
 });
 
 test('an exhausted ambiguous tombstone fails closed until expiry', async () => {

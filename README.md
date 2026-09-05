@@ -92,11 +92,12 @@ node --test scripts/steward-relay.test.mjs
 node scripts/phase7-live-relay-demo.mjs
 ```
 
-The demo creates its bearer token internally and never prints it. It uses the proof
-service for contract setup and the wallet's separate DUST proof, never for Slip's native
-`sealPick` proof. Set `SLIP_PROVE_CLI` only when the native CLI is not at the documented
-default path. This host component test is not a substitute for the pending authenticated
-physical-device run.
+The self-contained demo creates its bearer token internally and never prints it; the
+operator-only serve mode instead prints a one-time setup token to its trusted local
+terminal. The demo uses the proof service for contract setup and the wallet's separate
+DUST proof, never for Slip's native `sealPick` proof. Set `SLIP_PROVE_CLI` only when the
+native CLI is not at the documented default path. This host component test is not a
+substitute for an authenticated physical-device run.
 
 ## Design and documentation
 
