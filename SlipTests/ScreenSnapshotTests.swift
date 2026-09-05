@@ -13,12 +13,18 @@ struct ScreenSnapshotTests {
     @Test("Every screen matches its reviewed light, dark, XL and accessibility snapshots")
     func allScreens() async throws {
         let record = ProcessInfo.processInfo.environment["SLIP_RECORD_SNAPSHOTS"] == "1"
+        let selected = Set((ProcessInfo.processInfo.environment["SLIP_SNAPSHOT_SCREENS"] ?? "")
+            .split(separator: ",").map(String.init))
+        if record {
+            try #require(!selected.isEmpty, "Recording requires an explicit SLIP_SNAPSHOT_SCREENS allowlist")
+            try #require(selected.isSubset(of: Set(SlipScreen.allCases.map(\.rawValue))), "Unknown snapshot screen")
+        }
         for screen in SlipScreen.allCases {
             for variant in SnapshotVariant.allCases {
                 let name = "\(screen.rawValue)-\(variant.rawValue)"
                 let image = try await drawHierarchyInKeyWindow(screen: screen, variant: variant)
                 let url = Self.directory.appendingPathComponent(name).appendingPathExtension("png")
-                if record {
+                if record && selected.contains(screen.rawValue) {
                     try FileManager.default.createDirectory(at: Self.directory, withIntermediateDirectories: true)
                     try #require(image.pngData()).write(to: url)
                 } else {

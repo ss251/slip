@@ -61,7 +61,8 @@ struct HomeScreen: View {
                 HomeDayHeading(day: "Today", state: "Wednesday")
                 HomeCompactSlipRow(
                     question: "Does the demo survive the all-hands?",
-                    detail: "Opens 17:00 · Office pool",
+                    crew: "Office pool",
+                    detail: "Opens 17:00",
                     palette: HomeMetrics.officePalette,
                     state: .sealed
                 ) {
@@ -74,6 +75,7 @@ struct HomeScreen: View {
             HomeDayHeading(day: "Tuesday", state: "Settled")
             HomeCompactSlipRow(
                 question: "Will Raj actually ship this week?",
+                crew: "Saturday crew",
                 detail: "He didn’t · 4 of 5 called it",
                 palette: HomeMetrics.settledPalette,
                 state: .score("+1")
@@ -234,6 +236,7 @@ private enum HomeRowState {
 private struct HomeCompactSlipRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     let question: String
+    let crew: String
     let detail: String
     let palette: Int
     let state: HomeRowState
@@ -247,6 +250,11 @@ private struct HomeCompactSlipRow: View {
                 layout {
                     if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.art, palette: palette) }
                     VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+                        HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
+                            Text(crew).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                            Spacer(minLength: SlipSpacing.tiny)
+                            rowStatus
+                        }
                         Text(question)
                             .font(SlipFont.headline)
                             .foregroundStyle(SlipColor.ink)
@@ -257,20 +265,20 @@ private struct HomeCompactSlipRow: View {
                             .multilineTextAlignment(.leading)
                     }
                     if !typeSize.isAccessibilitySize { Spacer(minLength: SlipSpacing.small) }
-                    switch state {
-                    case .sealed:
-                        SealGlyph()
-                    case .score(let score):
-                        Text(score)
-                            .font(SlipFont.title3Bold)
-                            .foregroundStyle(SlipColor.win)
-                    }
+
                 }
             }
             .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
         }
         .buttonStyle(.plain)
     }
+    @ViewBuilder private var rowStatus: some View {
+        switch state {
+        case .sealed: SealStatusTag()
+        case .score(let score): Text(score).font(SlipFont.footnote).foregroundStyle(SlipColor.win)
+        }
+    }
+
 }
 
 private struct EmptyPickStack: View {
@@ -408,13 +416,9 @@ private struct HowStepMark: View {
         case .seal:
             Circle().fill(SlipColor.seal).frame(width: SlipSize.sealMark, height: SlipSize.sealMark)
         case .roster:
-            HStack(spacing: SlipSpacing.tiny) {
-                ForEach(HowStepContent.rosterStates.indices, id: \.self) { index in
-                    SealGlyph(sealed: HowStepContent.rosterStates[index])
-                        .scaleEffect(HomeMetrics.miniGlyphScale)
-                        .frame(width: SlipSize.largeIcon, height: SlipSize.minimumTap)
-                }
-            }
+            Text("3 sealed · 2 waiting")
+                .font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+
         case .open:
             Text("Yes  Yes  No  Yes  No")
                 .font(SlipFont.subheadlineBold)

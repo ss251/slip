@@ -338,7 +338,7 @@ struct InviteScreen: View {
                         } label: {
                             SlipCard {
                                 HStack(spacing: SlipSpacing.medium) {
-                                    SealGlyph()
+                                    SealStatusTag()
                                     VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
                                         Text(model.sampleQuestion)
                                             .font(SlipFont.headline)

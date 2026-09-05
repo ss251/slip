@@ -99,37 +99,16 @@ private struct CrewSummaryRow: View {
 
     var body: some View {
         Button(action: action) {
-            Group {
-                if typeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: SlipSpacing.medium) {
-                        HStack(spacing: SlipSpacing.medium) {
-                            CrewArt(size: SlipSize.art, palette: palette)
-                            labels
-                        }
-                        HStack(spacing: SlipSpacing.medium) {
-                            Text(status)
-                                .font(sealState == false ? SlipFont.subheadlineBold : SlipFont.subheadline)
-                                .foregroundStyle(sealState == false ? SlipColor.ink : SlipColor.secondary)
-                            Spacer(minLength: SlipSpacing.small)
-                            if let sealState {
-                                SealGlyph(sealed: sealState)
-                            }
-                        }
+            HStack(spacing: SlipSpacing.medium) {
+                if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.art, palette: palette) }
+                VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+                    HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
+                        Text(name).font(SlipFont.headline).foregroundStyle(SlipColor.ink)
+                        Spacer(minLength: SlipSpacing.tiny)
+                        Text(status).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
                     }
-                } else {
-                    HStack(spacing: SlipSpacing.medium) {
-                        CrewArt(size: SlipSize.art, palette: palette)
-                        labels.frame(maxWidth: .infinity, alignment: .leading)
-                        Text(status)
-                            .font(sealState == false ? SlipFont.subheadlineBold : SlipFont.subheadline)
-                            .foregroundStyle(sealState == false ? SlipColor.ink : SlipColor.secondary)
-                            .multilineTextAlignment(.trailing)
-                            .fixedSize(horizontal: true, vertical: false)
-                        if let sealState {
-                            SealGlyph(sealed: sealState)
-                        }
-                    }
-                }
+                    Text(detail).font(SlipFont.subheadline).foregroundStyle(SlipColor.secondary)
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, SlipSpacing.standard)
             .padding(.vertical, SlipSpacing.medium)
@@ -244,7 +223,7 @@ struct CrewDetailScreen: View {
                     if typeSize.isAccessibilitySize {
                         VStack(alignment: .leading, spacing: SlipSpacing.medium) {
                             HStack {
-                                SealGlyph(sealed: false)
+                                SealStatusTag(sealed: false)
                                 Spacer(minLength: SlipSpacing.standard)
                                 Image(systemName: "chevron.right")
                                     .font(SlipFont.footnoteBold)
@@ -254,7 +233,7 @@ struct CrewDetailScreen: View {
                         }
                     } else {
                         HStack(spacing: SlipSpacing.medium) {
-                            SealGlyph(sealed: false)
+                            SealStatusTag(sealed: false)
                             openSlipLabels
                             Spacer(minLength: SlipSpacing.small)
                             Image(systemName: "chevron.right")
@@ -401,7 +380,8 @@ struct YouScreen: View {
                 VStack(spacing: SlipSpacing.zero) {
                     ProfileHistoryRow(
                         question: model.sampleQuestion,
-                        detail: "Sealed · opens Fri 21:00",
+                        crew: "Saturday crew",
+                        detail: "Opens Fri 21:00",
                         palette: CrewMetrics.saturdayPalette,
                         accessory: .sealed
                     ) {
@@ -410,6 +390,7 @@ struct YouScreen: View {
                     InsetDivider(inset: CrewMetrics.historyDividerInset)
                     ProfileHistoryRow(
                         question: "Does the demo survive the all-hands?",
+                        crew: "Office pool",
                         detail: "Yes · opens today 17:00",
                         palette: CrewMetrics.officePalette,
                         accessory: .sealed
@@ -419,6 +400,7 @@ struct YouScreen: View {
                     InsetDivider(inset: CrewMetrics.historyDividerInset)
                     ProfileHistoryRow(
                         question: "Will Raj actually ship this week?",
+                        crew: "Saturday crew",
                         detail: "No · called it",
                         palette: CrewMetrics.saturdayPalette,
                         accessory: .score("+1")
@@ -490,6 +472,7 @@ private enum ProfileHistoryAccessory {
 
 private struct ProfileHistoryRow: View {
     let question: String
+    let crew: String
     let detail: String
     let palette: Int
     let accessory: ProfileHistoryAccessory
@@ -504,7 +487,6 @@ private struct ProfileHistoryRow: View {
                         HStack {
                             CrewArt(size: SlipSize.artSmall, palette: palette)
                             Spacer(minLength: SlipSpacing.standard)
-                            historyAccessory
                         }
                         historyLabels
                     }
@@ -512,7 +494,6 @@ private struct ProfileHistoryRow: View {
                     HStack(spacing: SlipSpacing.medium) {
                         CrewArt(size: SlipSize.artSmall, palette: palette)
                         historyLabels.frame(maxWidth: .infinity, alignment: .leading)
-                        historyAccessory
                     }
                 }
             }
@@ -525,6 +506,11 @@ private struct ProfileHistoryRow: View {
 
     private var historyLabels: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+            HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
+                Text(crew).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                Spacer(minLength: SlipSpacing.tiny)
+                historyAccessory
+            }
             Text(question)
                 .font(SlipFont.subheadlineBold)
                 .foregroundStyle(SlipColor.ink)
@@ -540,10 +526,10 @@ private struct ProfileHistoryRow: View {
     @ViewBuilder private var historyAccessory: some View {
         switch accessory {
         case .sealed:
-            SealGlyph()
+            SealStatusTag()
         case .score(let score):
             Text(score)
-                .font(SlipFont.title3Bold)
+                .font(SlipFont.footnote)
                 .foregroundStyle(SlipColor.win)
         }
     }

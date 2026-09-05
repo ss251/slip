@@ -1523,7 +1523,7 @@ private struct ResultRosterRow: View {
                     }
                 }
             }
-            if let sealed = item.sealed { SealGlyph(sealed: sealed) }
+            if item.value == nil, let sealed = item.sealed { SealStatusTag(sealed: sealed) }
             if let score = item.score {
                 Text(score)
                     .font(SlipFont.bodyBold)

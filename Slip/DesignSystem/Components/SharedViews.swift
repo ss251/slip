@@ -79,17 +79,21 @@ struct InitialAvatar: View {
     }
 }
 
-struct SealGlyph: View {
+/// Status is a text annotation, never a control-shaped accessory.
+struct SealStatusTag: View {
     var sealed = true
     var body: some View {
-        RoundedRectangle(cornerRadius: SlipRadius.crest)
-            .stroke(SlipColor.separator, style: StrokeStyle(lineWidth: SlipStroke.standard,
-                    dash: sealed ? [] : SlipStroke.dashed))
-            .overlay {
-                if sealed { Circle().fill(SlipColor.seal).frame(width: SlipSize.sealDot, height: SlipSize.sealDot) }
+        Group {
+            if sealed {
+                Text("\(Image(systemName: "circle.fill")) Sealed")
+                    .foregroundStyle(SlipColor.seal)
+            } else {
+                Text("Waiting").foregroundStyle(SlipColor.secondary)
             }
-            .frame(width: SlipSize.sealMark, height: SlipSize.sealMarkLarge)
-            .accessibilityLabel(sealed ? "Sealed" : "Waiting")
+        }
+        .font(SlipFont.footnote)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityLabel(sealed ? "Sealed" : "Waiting")
     }
 }
 
@@ -243,7 +247,7 @@ struct MemberRow: View {
                 Text(value).font(SlipFont.bodyBold).strikethrough(struck)
                     .foregroundStyle(struck ? SlipColor.secondary : SlipColor.ink)
             }
-            if let sealed { SealGlyph(sealed: sealed) }
+            if let sealed { SealStatusTag(sealed: sealed) }
             if let score {
                 Text(score).font(SlipFont.bodyBold).foregroundStyle(winner ? SlipColor.win : SlipColor.secondary)
                     .frame(minWidth: SlipSize.minimumTap, alignment: .trailing)
