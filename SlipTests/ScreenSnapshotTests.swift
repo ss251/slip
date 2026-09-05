@@ -51,45 +51,97 @@ struct ScreenSnapshotTests {
         #expect(UIFont(name: "JetBrainsMono-Regular", size: 12) != nil)
     }
 
-    @Test("Small white seal copy has AA contrast on the rendered art wash")
+    @Test("Small white seal copy keeps AAA over every rendered crew-art palette")
     func sealCanvasContrast() async throws {
-        let image = try await drawHierarchyInKeyWindow(screen: .seal, variant: .light)
+        try #require(!UIAccessibility.isReduceTransparencyEnabled,
+                     "Disable Reduce Transparency in the simulator to verify the real crew-art canvas")
+        // Exercise the actual non-Reduce-Transparency view, including blur and overlays.
+        // Choose a public synthetic crew key for every palette, without reaching model data.
+        var keysByPalette: [Int: String] = [:]
+        for candidate in 0..<10000 {
+            let key = "ambient-crew-\(candidate)"
+            keysByPalette[SlipArt.paletteIndex(for: key)] = key
+            if keysByPalette.count == SlipColor.artPalettes.count { break }
+        }
+        try #require(keysByPalette.count == SlipColor.artPalettes.count)
+        let size = CGSize(width: 393, height: 852)
+        for appearance in [UIUserInterfaceStyle.light, .dark] {
+            for palette in SlipColor.artPalettes.indices {
+                let key = try #require(keysByPalette[palette])
+                let root = AmbientBackground(crewID: key)
+                    .environment(\.colorScheme, appearance == .dark ? .dark : .light)
+                    .environment(\.slipAccessibility, AccessibilityOverrides())
+                let image = try await drawHierarchyInKeyWindow(root: root, size: size, appearance: appearance)
+                let range = try canvasLuminanceRange(image)
+                let foreground = luminance([242.0 / 255, 242.0 / 255, 247.0 / 255])
+                let ratio = (foreground + 0.05) / (range.upperBound + 0.05)
+                #expect(ratio >= 7, "Rendered ambient palette \(palette), \(appearance): \(ratio):1")
+                #expect(range.upperBound - range.lowerBound > 0.003,
+                        "Crew art disappeared into a flat ambient surface: palette \(palette)")
+                print("Rendered ambient palette \(palette), \(appearance): minimum \(ratio):1")
+            }
+            // The brief preserves the documented flat accessibility ground. It is AA,
+            // not AAA, for the dimmer onTicket token; do not mislabel that baseline.
+            let flat = AmbientBackground()
+                .environment(\.colorScheme, appearance == .dark ? .dark : .light)
+                .environment(\.slipAccessibility, AccessibilityOverrides(reduceTransparency: true))
+            let flatImage = try await drawHierarchyInKeyWindow(root: flat, size: size, appearance: appearance)
+            let flatRange = try canvasLuminanceRange(flatImage)
+            let foreground = luminance([242.0 / 255, 242.0 / 255, 247.0 / 255])
+            #expect((foreground + 0.05) / (flatRange.upperBound + 0.05) >= 4.5)
+            #expect(flatRange.upperBound - flatRange.lowerBound < 0.001,
+                    "Reduce Transparency must remove the decorative art")
+        }
+    }
+
+    private func luminance(_ components: [Double]) -> Double {
+        let linear = components.map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
+        return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722
+    }
+
+    private func canvasLuminanceRange(_ image: UIImage) throws -> ClosedRange<Double> {
         let cg = try #require(image.cgImage)
         let rgba = try pixels(image)
-        func luminance(_ components: [Double]) -> Double {
-            let linear = components.map { $0 <= 0.04045 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
-            return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722
+        var minimum = Double.infinity
+        var maximum = -Double.infinity
+        // Measure every rendered pixel. A lookup table keeps the whole-canvas bound
+        // cheap enough to check every identity in both appearances.
+        let linear = (0...255).map { component -> Double in
+            let value = Double(component) / 255
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
         }
-        let foreground = luminance([242.0 / 255, 242.0 / 255, 247.0 / 255])
-        var minimumRatio = Double.infinity
-        // Preserve the same point-space gutter and coverage at any render scale.
-        // The gutter avoids all private/synthetic pick text and controls.
-        let gutterX = Int(2 * image.scale)
-        let startY = Int(80 * image.scale)
-        let endY = cg.height - Int(50 * image.scale)
-        let sampleStep = max(1, Int(10 * image.scale))
-        for y in stride(from: startY, to: endY, by: sampleStep) {
-            let offset = (y * cg.width + gutterX) * 4
-            let background = luminance((0..<3).map { Double(rgba[offset + $0]) / 255 })
-            minimumRatio = min(minimumRatio, (foreground + 0.05) / (background + 0.05))
+        for offset in stride(from: 0, to: cg.width * cg.height * 4, by: 4) {
+            let value = linear[Int(rgba[offset])] * 0.2126
+                + linear[Int(rgba[offset + 1])] * 0.7152
+                + linear[Int(rgba[offset + 2])] * 0.0722
+            minimum = min(minimum, value)
+            maximum = max(maximum, value)
         }
-        #expect(minimumRatio >= 4.5, "Rendered seal canvas contrast: \(minimumRatio):1")
+        return minimum...maximum
     }
 
     private func drawHierarchyInKeyWindow(screen: SlipScreen, variant: SnapshotVariant) async throws -> UIImage {
-        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
-        let previous = scene.windows.first(where: \.isKeyWindow)
-        let window = UIWindow(windowScene: scene)
         let isAccessibility = variant == .accessibility || variant == .accessibilityMax
         let size = CGSize(width: 393, height: isAccessibility ? 1100 : 852)
-        window.frame = CGRect(origin: .zero, size: size)
+        let isAmbientScreen = [SlipScreen.seal, .sealing, .proofFailed, .alreadySealed].contains(screen)
+        let reduceTransparency = isAccessibility || !isAmbientScreen
         let root = SlipRootView(model: .preview(screen), flow: SealFlowModel())
             .environment(\.colorScheme, variant == .dark ? .dark : .light)
             .environment(\.dynamicTypeSize, variant == .xl ? .xLarge : variant == .accessibility ? .accessibility1 : variant == .accessibilityMax ? .accessibility5 : .large)
             .environment(\.slipAccessibility, AccessibilityOverrides(reduceMotion: true,
-                reduceTransparency: true, increaseContrast: isAccessibility))
+                reduceTransparency: reduceTransparency, increaseContrast: isAccessibility))
+        return try await drawHierarchyInKeyWindow(root: root, size: size,
+                                                  appearance: variant == .dark ? .dark : .light)
+    }
+
+    private func drawHierarchyInKeyWindow<Content: View>(root: Content, size: CGSize,
+                                                       appearance: UIUserInterfaceStyle) async throws -> UIImage {
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: size)
         let host = UIHostingController(rootView: root)
-        host.overrideUserInterfaceStyle = variant == .dark ? .dark : .light
+        host.overrideUserInterfaceStyle = appearance
         window.rootViewController = host
         window.makeKeyAndVisible()
         host.view.frame = window.bounds

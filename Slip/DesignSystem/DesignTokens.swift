@@ -97,6 +97,8 @@ enum SlipSize {
     static let avatar: CGFloat = 48
     static let avatarLarge: CGFloat = 64
     static let avatarHero: CGFloat = 72
+    static let ambientBlur: CGFloat = 60
+    static let ambientArtScale: CGFloat = 1.3
     static let artIdentity: CGFloat = 14
     static let questionLines = 2
     static let artSmall: CGFloat = 44
@@ -132,8 +134,11 @@ enum SlipStroke {
 }
 
 enum SlipOpacity {
-    // SwiftUI composites gradients in linear space; keep small white copy >=4.5:1.
-    static let ambientWash: Double = 0.04
+    static let ambientWash: Double = 0.35
+    static let ambientOverlay: Double = 0.55
+    // Additional depth is necessary: flat ambient alone gives onTicket only 6.39:1.
+    // Keep the actual composite >=7:1; sealCanvasContrast measures every palette.
+    static let ambientShade: Double = 0.52
     static let faint: Double = 0.08
     static let subtle: Double = 0.16
     static let muted: Double = 0.32

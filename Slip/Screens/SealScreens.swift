@@ -24,36 +24,39 @@ struct SealScreen: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: SlipSpacing.screen) {
-                SheetHeading(title: already ? "Already sealed" : proving ? "Sealing" : "Seal your pick", light: true)
-                ContextRow(detail: model.isPreview ? "Saturday crew · 3 of 5 sealed"
-                           : "\(model.localRound.crewName) · local proof only", light: true,
-                           crewID: model.isPreview ? PreviewContent.crew : model.localRound.crewName)
-                pickCard.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
-                if already {
-                    explanation("You sealed this on this iPhone", "A sealed pick can’t be changed or sealed twice. That’s the whole point.")
-                } else if failed {
-                    explanation("Couldn’t finish the proof", "It stopped partway. Nothing left this phone; your pick is still only here.")
-                    if let failure = flow.failure {
-                        Text(failure.displayName).font(SlipFont.machine).foregroundStyle(SlipColor.onTicket)
-                            .accessibilityLabel("Error: \(failure.displayName)")
+        VStack(spacing: SlipSpacing.zero) {
+            ScrollView {
+                VStack(spacing: SlipSpacing.screen) {
+                    SheetHeading(title: already ? "Already sealed" : proving ? "Sealing" : "Seal your pick", light: true)
+                    ContextRow(detail: model.isPreview ? "Saturday crew · 3 of 5 sealed"
+                               : "\(model.localRound.crewName) · local proof only", light: true,
+                               crewID: model.isPreview ? PreviewContent.crew : model.localRound.crewName)
+                    pickCard.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
+                    if already {
+                        explanation("You sealed this on this iPhone", "A sealed pick can’t be changed or sealed twice. That’s the whole point.")
+                    } else if failed {
+                        explanation("Couldn’t finish the proof", "It stopped partway. Nothing left this phone; your pick is still only here.")
+                        if let failure = flow.failure {
+                            Text(failure.displayName).font(SlipFont.machine).foregroundStyle(SlipColor.onTicket)
+                                .accessibilityLabel("Error: \(failure.displayName)")
+                        }
+                    } else if proving {
+                        VStack(spacing: SlipSpacing.medium) {
+                            Text("Proving on this iPhone").font(SlipFont.headline)
+                            ProgressView().tint(SlipColor.onSeal).accessibilityLabel("Making your proof")
+                            Text("Nothing leaves until it’s done.").font(SlipFont.footnote).foregroundStyle(SlipColor.onTicket)
+                        }.padding(.top, SlipSpacing.medium)
+                    } else {
+                        choices.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
+                        Text("Nobody — not even Slip — can read a sealed pick.")
+                            .font(SlipFont.footnote).foregroundStyle(SlipColor.onTicket).multilineTextAlignment(.center)
                     }
-                } else if proving {
-                    VStack(spacing: SlipSpacing.medium) {
-                        Text("Proving on this iPhone").font(SlipFont.headline)
-                        ProgressView().tint(SlipColor.onSeal).accessibilityLabel("Making your proof")
-                        Text("Nothing leaves until it’s done.").font(SlipFont.footnote).foregroundStyle(SlipColor.onTicket)
-                    }.padding(.top, SlipSpacing.medium)
-                } else {
-                    choices.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
-                    Text("Nobody — not even Slip — can read a sealed pick.")
-                        .font(SlipFont.footnote).foregroundStyle(SlipColor.onTicket).multilineTextAlignment(.center)
-                }
-            }.padding(.horizontal, SlipSpacing.large)
-                .padding(.bottom, SlipSpacing.large)
+                }.padding(.horizontal, SlipSpacing.large)
+                    .padding(.bottom, SlipSpacing.large)
+            }
+            .clipped()
+            bottom
         }
-        .safeAreaInset(edge: .bottom) { bottom }
         .background { AmbientBackground(crewID: model.isPreview ? PreviewContent.crew : model.localRound.crewName) }
         .foregroundStyle(SlipColor.onSeal)
         .preferredColorScheme(.dark)
@@ -131,7 +134,7 @@ struct SealScreen: View {
     }
 
     @ViewBuilder private var bottom: some View {
-        BottomActions(background: SlipColor.ambient) {
+        BottomActions(background: SlipColor.clear) {
             if already {
                 PillButton(title: "See your ticket", tone: .white) { model.go(.ticket) }
             } else if failed {
@@ -191,13 +194,21 @@ struct SealScreen: View {
 
 struct AmbientBackground: View {
     var crewID: String = PreviewContent.crew
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.slipAccessibility) private var accessibility
+
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             SlipColor.ambient
-            ArtField(crewID: crewID).frame(height: SlipArt.backdropHeight)
-                .opacity(SlipOpacity.ambientWash)
-                .mask(LinearGradient(colors: [SlipColor.onSeal, SlipColor.clear], startPoint: .top, endPoint: .bottom))
-        }.ignoresSafeArea()
+            if !(reduceTransparency || accessibility.reduceTransparency) {
+                ArtField(crewID: crewID)
+                    .blur(radius: SlipSize.ambientBlur, opaque: true)
+                    .scaleEffect(SlipSize.ambientArtScale)
+                    .opacity(SlipOpacity.ambientWash)
+                SlipColor.ambient.opacity(SlipOpacity.ambientOverlay)
+                SlipColor.ticket.opacity(SlipOpacity.ambientShade)
+            }
+        }.clipped().ignoresSafeArea()
     }
 }
 
