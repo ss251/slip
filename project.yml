@@ -37,12 +37,14 @@ targets:
           for circuit in enrollMember createSlip sealPick reveal settle dispute; do
             cp "${SRCROOT}/contracts/build/zkir/$circuit.zkir" "$DEST/zkir/"
             cp "${SRCROOT}/contracts/build/keys/$circuit.prover" "$DEST/keys/"
+            cp "${SRCROOT}/contracts/build/keys/$circuit.verifier" "$DEST/keys/"
           done
           cp "${SRCROOT}/.build/app-proof-params/bls_midnight_2p13" "$DEST/params/"
           cp "${SRCROOT}/.build/app-proof-params/bls_midnight_2p14" "$DEST/params/"
         inputFiles:
           - $(SRCROOT)/contracts/build/zkir/sealPick.zkir
           - $(SRCROOT)/contracts/build/keys/sealPick.prover
+          - $(SRCROOT)/contracts/build/keys/sealPick.verifier
           - $(SRCROOT)/contracts/build/zkir/enrollMember.zkir
           - $(SRCROOT)/contracts/build/zkir/createSlip.zkir
           - $(SRCROOT)/contracts/build/zkir/reveal.zkir
@@ -58,6 +60,7 @@ targets:
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/sealPick.zkir
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/sealPick.prover
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/sealPick.verifier
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/params/bls_midnight_2p14
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/params/bls_midnight_2p13
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/enrollMember.zkir

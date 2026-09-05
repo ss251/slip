@@ -166,7 +166,7 @@ public actor Prover {
     ) async throws -> ProvedTransaction {
         try artifacts.validate(circuit: circuit)
         let verifier = artifacts.keysDirectory.appendingPathComponent("\(circuit).verifier").path
-        guard FileManager.default.fileExists(atPath: verifier) else { throw MidnightKitError.provingKeyMissing(circuit: circuit) }
+        guard FileManager.default.fileExists(atPath: verifier) else { throw MidnightKitError.verifierKeyMissing(circuit: circuit) }
         let (zkir, keys, params) = (artifacts.circuitsDirectory.path, artifacts.keysDirectory.path, artifacts.parametersDirectory.path)
         return try await withCheckedThrowingContinuation { continuation in
             let thread = Thread {

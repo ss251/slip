@@ -18,6 +18,8 @@ public enum MidnightKitError: Error, Equatable, Sendable {
     case bindingInputInvalid
     /// Native transaction assembly/proving failed (details on stderr, never transcript data).
     case assemblyFailed
+    /// The circuit's verifier key (`<circuit>.verifier`) is not bundled; transaction assembly needs it.
+    case verifierKeyMissing(circuit: String)
 
     /// Maps the FFI's negative return codes. Anything unrecognised stays `proveFailed`
     /// with its raw code rather than being flattened into a generic error — a code we
@@ -53,6 +55,7 @@ extension MidnightKitError: CustomStringConvertible {
         case .proofDataInvalid:            "proofData from the runtime could not be decoded into a preimage"
         case .bindingInputInvalid:         "transaction binding input is not a valid field element"
         case .assemblyFailed:              "transaction assembly or proving failed"
+        case .verifierKeyMissing(let c):   "no verifier key bundled for '\(c)' — assembly needs <circuit>.verifier"
         }
     }
 }

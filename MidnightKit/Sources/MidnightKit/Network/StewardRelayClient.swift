@@ -14,6 +14,7 @@ public struct NetworkContext: Sendable, Equatable {
 
 public struct SubmissionReceipt: Sendable, Equatable, Decodable {
     public let txID: String
+    public init(txID: String) { self.txID = txID }
     enum CodingKeys: String, CodingKey { case txID = "txId" }
 }
 

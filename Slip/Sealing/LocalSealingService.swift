@@ -1045,6 +1045,7 @@ actor LocalSealingService {
         case .cancelled: .cancelled
         case .runtime: .runtime
         case .proofDataInvalid: .proofDataInvalid
+        case .bindingInputInvalid, .assemblyFailed, .verifierKeyMissing: .proveFailed
         }
     }
 }
