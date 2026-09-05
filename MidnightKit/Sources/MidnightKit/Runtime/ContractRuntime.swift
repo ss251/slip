@@ -56,6 +56,21 @@ public final class ContractRuntime {
         return v.toString()
     }
 
+    /// Loads a deployed contract's current state (tagged `ContractState` bytes from the
+    /// indexer) into the runtime and returns a JS expression that evaluates to the charged
+    /// state object a circuit driver passes to `createCircuitContext`. This is the network
+    /// path: the phone executes against the live chain state, never a state it invented.
+    public func loadContractState(_ tagged: Data) throws -> String {
+        let handle = tagged.withUnsafeBytes { buf -> UInt64 in
+            slip_state_from_tagged(buf.bindMemory(to: UInt8.self).baseAddress, buf.count)
+        }
+        guard handle != 0 else { throw MidnightKitError.runtime("contract state bytes did not decode") }
+        // The runtime accepts ChargedState/ContractState/StateValue instances only (it type-checks
+        // createCircuitContext's argument), and its query path reads the handle from the
+        // ChargedState — so hand it a real ChargedState that carries our handle.
+        return "((() => { const R = __compactRuntime; const cs = new R.ChargedState(R.StateValue.newNull()); cs._rustHandle = \(handle); return cs; })())"
+    }
+
     // MARK: - Native hooks (names are the runtime's; grep `globalThis.__native_` in the shim)
 
     /// Copy a Rust `char*` result and free it.

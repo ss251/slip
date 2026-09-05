@@ -46,6 +46,28 @@ struct ContractRuntimeTests {
     })()
     """
 
+    /// The NETWORK flow: no local enrol/create replay — sealPick runs straight against the
+    /// live contract state (here: the exported post-createSlip fixture) with the member's
+    /// own secret. Mirrors export-preimage.mjs's sealPick call exactly.
+    static func networkSealPickDriver(stateExpression: String) -> String { """
+    (function(){
+      const rt = __compactRuntime, C = __slipContract;
+      const ADDR = '11'.repeat(32), CPK = { bytes: new Uint8Array(32) };
+      const MEMBER = new Uint8Array(32).fill(2);
+      const NOW = 1788000000;
+      const w = { localSecretKey: ({ privateState }) => [privateState, MEMBER], localPick: ({ privateState }) => [privateState, 1n] };
+      const state = \(stateExpression);
+      const c = new C.Contract(w);
+      const ctx = rt.createCircuitContext(ADDR, CPK, state, undefined, undefined, undefined, NOW + 600);
+      ctx.currentQueryContext.block.secondsSinceEpoch = BigInt(NOW + 600);
+      const pd = c.impureCircuits.sealPick(ctx).proofData;
+      const enc = (v) => JSON.parse(JSON.stringify(v, (_, x) =>
+        typeof x === 'bigint' ? x.toString() : (x instanceof Uint8Array ? Array.from(x) : x)));
+      return JSON.stringify({ input: enc(pd.input), output: enc(pd.output),
+        publicTranscript: enc(pd.publicTranscript), privateTranscriptOutputs: enc(pd.privateTranscriptOutputs) });
+    })()
+    """ }
+
     static func fixture(_ name: String) throws -> Data {
         let url = Bundle.module.url(forResource: name, withExtension: nil, subdirectory: "Fixtures")
             ?? Bundle.module.resourceURL!.appendingPathComponent("Fixtures/\(name)")
@@ -131,5 +153,25 @@ struct ContractRuntimeTests {
         #expect(tx.data.count > 4480)
         // Tagged ledger envelope: "midnight:transaction[…" prefix
         #expect(String(decoding: tx.data.prefix(20), as: UTF8.self).hasPrefix("midnight:transaction"))
+    }
+
+    @Test("network flow: sealPick against the LIVE contract state yields Node's proofData and assembles")
+    func networkFlowAgainstLiveState() async throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("contracts/build")
+        let state = try Data(contentsOf: root.appendingPathComponent("sealPick.state.bin"))
+        let rt = try ContractRuntime()
+        let stateExpr = try rt.loadContractState(state)
+        let json = try rt.evaluate(Self.networkSealPickDriver(stateExpression: stateExpr))
+        let device = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! NSDictionary
+        let golden = try JSONSerialization.jsonObject(with: Self.fixture("sealPick-proofdata.json")) as! NSDictionary
+        #expect(device == golden, "sealPick against loaded live state must equal Node's proofData")
+        let prover = Prover(artifacts: Self.artifacts)
+        let tx = try await prover.buildProvedCallTransaction(
+            circuit: "sealPick", proofData: json, networkID: "undeployed",
+            contractAddressHex: String(repeating: "11", count: 32), contractState: state,
+            blockTime: 1_788_000_600, ttl: 1_788_002_400)
+        print("NETWORK FLOW proved tx: \(tx.data.count) bytes in \(tx.duration)")
+        #expect(tx.data.count > 4480)
     }
 }

@@ -50,3 +50,5 @@ int32_t  slip_build_proved_call_tx(const char *proofdata_json, const char *netwo
                                    uint8_t **out_tx, size_t *out_tx_len);
 /* Call once before proving: rayon workers adopt USER_INITIATED QoS (fixes the priority inversion). 0 = ours, 1 = pool pre-existed. */
 int32_t  slip_init_thread_pool(void);
+/* Tagged ContractState bytes (indexer / ContractState.serialize()) → runtime state handle (0 = failure). */
+uint64_t slip_state_from_tagged(const uint8_t *bytes, size_t len);
