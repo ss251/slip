@@ -90,6 +90,8 @@ enum SlipSize {
     static let avatar: CGFloat = 48
     static let avatarLarge: CGFloat = 64
     static let avatarHero: CGFloat = 72
+    static let artIdentity: CGFloat = 14
+    static let questionLines = 2
     static let artSmall: CGFloat = 44
     static let art: CGFloat = 56
     static let artLarge: CGFloat = 72

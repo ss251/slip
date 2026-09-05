@@ -21,7 +21,8 @@ struct CrewsScreen: View {
                     VStack(spacing: SlipSpacing.zero) {
                         CrewSummaryRow(
                             name: "Saturday crew",
-                            detail: "5 people · 6 slips",
+                            people: "5 people",
+                            slips: "6 slips",
                             palette: CrewMetrics.saturdayPalette,
                             status: "Seal by Fri",
                             sealState: false
@@ -31,7 +32,8 @@ struct CrewsScreen: View {
                         InsetDivider(inset: CrewMetrics.summaryDividerInset)
                         CrewSummaryRow(
                             name: "Office pool",
-                            detail: "9 people · 14 slips",
+                            people: "9 people",
+                            slips: "14 slips",
                             palette: CrewMetrics.officePalette,
                             status: "Opens 17:00",
                             sealState: true
@@ -41,7 +43,8 @@ struct CrewsScreen: View {
                         InsetDivider(inset: CrewMetrics.summaryDividerInset)
                         CrewSummaryRow(
                             name: "Book club",
-                            detail: "4 people · 2 slips",
+                            people: "4 people",
+                            slips: "2 slips",
                             palette: CrewMetrics.bookPalette,
                             status: "Quiet",
                             sealState: nil
@@ -90,7 +93,8 @@ struct CrewsScreen: View {
 
 private struct CrewSummaryRow: View {
     let name: String
-    let detail: String
+    let people: String
+    let slips: String
     let palette: Int
     let status: String
     let sealState: Bool?
@@ -107,7 +111,13 @@ private struct CrewSummaryRow: View {
                         Spacer(minLength: SlipSpacing.tiny)
                         Text(status).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
                     }
-                    Text(detail).font(SlipFont.subheadline).foregroundStyle(SlipColor.secondary)
+                    let layout = typeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.tiny))
+                        : AnyLayout(HStackLayout(spacing: SlipSpacing.small))
+                    layout {
+                        RowMetadata(symbol: "person.2", text: people)
+                        RowMetadata(symbol: "doc", text: slips)
+                    }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, SlipSpacing.standard)
@@ -118,17 +128,6 @@ private struct CrewSummaryRow: View {
         .buttonStyle(SlipPressStyle())
     }
 
-    private var labels: some View {
-        VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-            Text(name)
-                .font(SlipFont.headline)
-                .foregroundStyle(SlipColor.ink)
-            Text(detail)
-                .font(SlipFont.subheadline)
-                .foregroundStyle(SlipColor.secondary)
-        }
-        .fixedSize(horizontal: false, vertical: true)
-    }
 }
 
 struct CrewDetailScreen: View {
@@ -506,19 +505,13 @@ private struct ProfileHistoryRow: View {
 
     private var historyLabels: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-            HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
-                Text(crew).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
-                Spacer(minLength: SlipSpacing.tiny)
-                historyAccessory
-            }
+            CrewIdentityLine(crew: crew, palette: palette) { historyAccessory }
             Text(question)
-                .font(SlipFont.subheadlineBold)
+                .font(SlipFont.headline)
                 .foregroundStyle(SlipColor.ink)
                 .multilineTextAlignment(.leading)
-            Text(detail)
-                .font(SlipFont.footnote)
-                .foregroundStyle(SlipColor.secondary)
-                .multilineTextAlignment(.leading)
+                .lineLimit(typeSize.isAccessibilitySize ? nil : SlipSize.questionLines)
+            RowMetadata(symbol: "clock", text: detail)
         }
         .fixedSize(horizontal: false, vertical: true)
     }

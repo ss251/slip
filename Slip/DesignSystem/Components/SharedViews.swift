@@ -67,6 +67,43 @@ struct ArtBackdrop: View {
     }
 }
 
+/// The shared who/what/when grammar keeps status attached to identity as text grows.
+struct CrewIdentityLine<Status: View>: View {
+    let crew: String
+    var palette: Int = 0
+    @ViewBuilder var status: Status
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.tiny))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SlipSpacing.small))
+        layout {
+            HStack(spacing: SlipSpacing.tiny) {
+                CrewArt(size: SlipSize.artIdentity, palette: palette)
+                Text(crew).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !typeSize.isAccessibilitySize { Spacer(minLength: SlipSpacing.tiny) }
+            status
+        }
+    }
+}
+
+struct RowMetadata: View {
+    let symbol: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.tiny) {
+            Image(systemName: symbol).accessibilityHidden(true)
+            Text(text).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(SlipFont.footnote).fontWeight(.regular)
+        .foregroundStyle(SlipColor.secondary)
+        .multilineTextAlignment(.leading)
+    }
+}
+
 struct InitialAvatar: View {
     let name: String
     var size: CGFloat = SlipSize.avatarSmall

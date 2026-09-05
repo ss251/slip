@@ -250,19 +250,13 @@ private struct HomeCompactSlipRow: View {
                 layout {
                     if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.art, palette: palette) }
                     VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-                        HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
-                            Text(crew).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
-                            Spacer(minLength: SlipSpacing.tiny)
-                            rowStatus
-                        }
+                        CrewIdentityLine(crew: crew, palette: palette) { rowStatus }
                         Text(question)
                             .font(SlipFont.headline)
                             .foregroundStyle(SlipColor.ink)
                             .multilineTextAlignment(.leading)
-                        Text(detail)
-                            .font(SlipFont.subheadline)
-                            .foregroundStyle(SlipColor.secondary)
-                            .multilineTextAlignment(.leading)
+                            .lineLimit(typeSize.isAccessibilitySize ? nil : SlipSize.questionLines)
+                        RowMetadata(symbol: "clock", text: detail)
                     }
                     if !typeSize.isAccessibilitySize { Spacer(minLength: SlipSpacing.small) }
 
@@ -270,7 +264,7 @@ private struct HomeCompactSlipRow: View {
             }
             .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SlipPressStyle())
     }
     @ViewBuilder private var rowStatus: some View {
         switch state {

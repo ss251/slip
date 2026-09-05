@@ -20,6 +20,7 @@ struct ScreenSnapshotTests {
             try #require(selected.isSubset(of: Set(SlipScreen.allCases.map(\.rawValue))), "Unknown snapshot screen")
         }
         for screen in SlipScreen.allCases {
+            if record && !selected.contains(screen.rawValue) { continue }
             for variant in SnapshotVariant.allCases {
                 let name = "\(screen.rawValue)-\(variant.rawValue)"
                 let image = try await drawHierarchyInKeyWindow(screen: screen, variant: variant)
