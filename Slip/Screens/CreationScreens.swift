@@ -320,22 +320,21 @@ struct InviteScreen: View {
                         Button {
                             model.inform("Join the crew before sealing its open slip.")
                         } label: {
-                            SlipCard {
-                                HStack(spacing: SlipSpacing.medium) {
-                                    SealStatusTag()
-                                    VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-                                        Text(model.sampleQuestion)
-                                            .font(SlipFont.headline)
-                                            .foregroundStyle(SlipColor.ink)
-                                            .multilineTextAlignment(.leading)
-                                        Text("3 of 5 sealed · seal by Fri 20:00")
-                                            .font(SlipFont.subheadline)
-                                            .foregroundStyle(SlipColor.secondary)
-                                            .multilineTextAlignment(.leading)
-                                    }
+                            VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
+                                CrewIdentityLine(crew: PreviewContent.crew) {
+                                    SealStatusTag(sealed: false)
                                 }
+                                Text(model.sampleQuestion)
+                                    .font(SlipFont.headline)
+                                    .foregroundStyle(SlipColor.ink)
+                                    .lineLimit(typeSize.isAccessibilitySize ? nil : SlipSize.questionLines)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                RowMetadata(symbol: "clock", text: "Seal by Fri 20:00 · 3 of 5 sealed")
                             }
-                            .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
+                            .padding(.vertical, SlipSpacing.medium)
+                            .frame(maxWidth: .infinity, minHeight: SlipSize.minimumTap, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
