@@ -19,7 +19,7 @@ The actor retains the original device secret and pick only in memory. The circui
 
 `ContractRuntime` executes compiler-generated JavaScript under JavaScriptCore. `Prover.prove(circuit:proofData:)` converts the private runtime transcript to a preimage in memory and generates the proof natively. Runtime input is never written out by the app.
 
-Historical physical-device benchmark (2026-09-03, iPhone 15 Pro/A17 Pro): `sealPick` proving-key load **24 ms**, proof generation **1,776 ms**, **4,480 bytes**, peak RSS **290 MB**. This is the real k14 circuit, not the earlier tiny-circuit benchmark. Source: [MidnightKit measurements](.claude/docs/midnightkit.md). No physical-device run was performed for the current app changes.
+Physical-device run (2026-09-05, iPhone 15 Pro / A17 Pro, iOS 26.6.1, this app build): the sealing and round-flow suites pass on the phone (13 tests, 2 suites) and the complete local lifecycle proves all six circuits with real, round-bound proofs (3 tests). Earlier standalone benchmark (2026-09-03, same phone): `sealPick` key load **24 ms**, prove **1,776 ms**, **4,480 bytes**, peak RSS **290 MB** — see [MidnightKit measurements](.claude/docs/midnightkit.md).
 
 Current app gate (2026-09-05, iPhone 17 Pro simulator / iOS 27): **34 tests passed**, including six real-circuit proving cases, the complete lifecycle, and circuit-level mismatch rejection followed by recovery. One complete-round run measured:
 
@@ -32,11 +32,22 @@ Current app gate (2026-09-05, iPhone 17 Pro simulator / iOS 27): **34 tests pass
 | `settle` | 30.7 ms | 14 ms | 820 ms | 4,480 |
 | `dispute` | 33.6 ms | 14 ms | 584 ms | 4,480 |
 
-These are single-run observations on the host CPU, not phone latency promises or a performance budget. Preparation includes runtime initialization and replay of accepted steps; key/prove durations come from `Proof`. Reproduce the public-only `LOCAL_ROUND_PROOF` measurements with `LocalRoundServiceTests`. Local execution/proving does **not** establish network acceptance. Source decisions and version caveats: [Phase 4 sources](docs/phase4-sources.md).
+Same lifecycle on the physical iPhone 15 Pro (iOS 26.6.1), one run, `LocalRoundServiceTests` on device:
+
+| Circuit | Execute | Key load | Prove | Proof bytes |
+|---|---|---|---|---|
+| `enrollMember` | 15.6 ms | 13 ms | 777 ms | 4,480 |
+| `createSlip` | 22.2 ms | 13 ms | 779 ms | 4,480 |
+| `sealPick` | 28.4 ms | 26 ms | 1,493 ms | 4,480 |
+| `reveal` | 27.9 ms | 26 ms | 1,845 ms | 4,480 |
+| `settle` | 34.5 ms | 13 ms | 1,046 ms | 4,480 |
+| `dispute` | 38.9 ms | 16 ms | 1,016 ms | 4,480 |
+
+Both tables are single-run observations (host CPU, then the phone), not latency promises or a performance budget. Preparation includes runtime initialization and replay of accepted steps; key/prove durations come from `Proof`. Reproduce the public-only `LOCAL_ROUND_PROOF` measurements with `LocalRoundServiceTests`. Local execution/proving does **not** establish network acceptance. Source decisions and version caveats: [Phase 4 sources](docs/phase4-sources.md).
 
 ## Build and test
 
-Swift 6/SwiftUI, an iOS 17 deployment target, and Liquid Glass where available. Current verification uses Xcode 27 beta and the iPhone 17 Pro iOS 27 simulator. iOS 17/26 runtime behavior and archive compatibility still need owner validation; the deployment setting alone is not compatibility evidence.
+Swift 6/SwiftUI, an iOS 17 deployment target, and Liquid Glass where available. Current verification uses Xcode 27 beta with the iPhone 17 Pro iOS 27 simulator, plus a physical iPhone 15 Pro on iOS 26.6.1 for the proving suites (above). iOS 17 runtime behavior and archive compatibility are still unverified; the deployment setting alone is not compatibility evidence.
 
 Prerequisites: Xcode, XcodeGen 2.45+, Compact compiler **0.31.1** (language **0.23.0**, runtime **0.16.0**, ledger **8**), Node/npm, generated contract artifacts, and the matching simulator native archive. No network services are needed to run the local app.
 
