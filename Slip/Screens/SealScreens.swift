@@ -1,3 +1,4 @@
+import MidnightKit
 import SwiftUI
 
 struct SealScreen: View {
@@ -214,6 +215,10 @@ struct TicketScreen: View {
     }
     private var sealedChoice: String { sealedDisplay?.selectedSide ?? (model.isPreview ? model.selectedSide : "Unavailable") }
     private var receipt: LocalSealReceipt? { flow.receipt?.roundID == model.localRound.id ? flow.receipt : nil }
+    @Environment(NetworkSealTracker.self) private var networkTracker: NetworkSealTracker?
+    private var networkReceipt: NetworkSealReceipt? { networkTracker?.receipt(for: model.localRound.id) }
+    private var networkConfirmation: ConfirmationStatus? { networkTracker?.confirmations[model.localRound.id] }
+    private static func short(_ hex: String) -> String { hex.count > 12 ? "\(hex.prefix(6))…\(hex.suffix(4))" : hex }
 
     var body: some View {
         if model.isPreview || (receipt != nil && sealedDisplay != nil) {
@@ -240,9 +245,20 @@ struct TicketScreen: View {
                 ticketCard.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
                 VStack(spacing: SlipSpacing.zero) {
                     fact("Proved", "on this iPhone")
+                    if let networkReceipt {
+                        fact("Left this iPhone", "the proof, never the pick")
+                        fact("Submitted", networkConfirmation == .confirmed ? "confirmed by the network" : (networkConfirmation == .rejected ? "rejected by the network" : "via the steward"))
+                        fact("Commitment", Self.short(networkReceipt.commitment.hexString), machine: true)
+                        fact("Transaction", Self.short(networkReceipt.txID), machine: true)
+                        fact("Execute", duration(networkReceipt.executeDuration))
+                        fact("Assemble + prove", duration(networkReceipt.assembleDuration))
+                        fact("Transaction size", "\(networkReceipt.transactionBytes) bytes")
+                    } else {
                     fact(receipt == nil && !postingLater ? "Left this iPhone" : "Sharing", receipt == nil && !postingLater ? "the proof, never the pick" : "Stays here in this local build")
                     fact(receipt == nil ? "Opens" : "Retention", receipt == nil ? "Friday 21:00, with everyone" : "This app session only")
-                    if let receipt {
+                    }
+                    if networkReceipt != nil {
+                    } else if let receipt {
                         fact("Proof time", duration(receipt.proveDuration))
                         fact("Key load", duration(receipt.keyLoadDuration))
                         fact("Proof size", "\(receipt.proofData.count) bytes")
@@ -250,7 +266,10 @@ struct TicketScreen: View {
                         fact("Receipt", "0x8f2a…c41d", machine: true)
                     }
                 }.padding(.top, SlipSpacing.small)
-                if postingLater || receipt != nil {
+                if networkReceipt != nil {
+                    Text("Your proof was made here and handed to the steward, who paid the fee and posted it. Only the proof and the commitment left this iPhone.")
+                        .font(SlipFont.footnote).foregroundStyle(SlipColor.ticketSecondary).multilineTextAlignment(.center)
+                } else if postingLater || receipt != nil {
                     Text("Your proof was made here. This local build doesn’t post it, and keeps this session in memory.")
                         .font(SlipFont.footnote).foregroundStyle(SlipColor.ticketSecondary).multilineTextAlignment(.center)
                 }

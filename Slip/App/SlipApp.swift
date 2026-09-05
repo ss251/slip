@@ -51,9 +51,22 @@ struct SlipApp: App {
         contrast = arguments.contains("--contrast")
         localFixture = selectedFixture
         exportPublicProof = arguments.contains("--export-public-proof")
-        _flow = State(initialValue: selectedFixture?.makeFlow(round: appModel.localRound) ?? SealFlowModel())
+        let setup = NetworkSetup.fromLaunchArguments(arguments) ?? NetworkSetup.load()
+        let tracker = NetworkSealTracker(relayHost: setup?.relayURL.host ?? (arguments.contains("--network-preview") ? "steward.local" : nil))
+        if arguments.contains("--network-preview") {
+            // Synthetic, clearly-fake receipt so the network ticket is reachable via simctl.
+            tracker.record(NetworkSealReceipt(commitment: Data(repeating: 0xe8, count: 32), txID: "0x" + String(repeating: "5f", count: 32),
+                                              executeDuration: .milliseconds(9), assembleDuration: .milliseconds(1641), transactionBytes: 5238),
+                           for: appModel.localRound.id)
+            tracker.record(.confirmed, for: appModel.localRound.id)
+        }
+        _networkTracker = State(initialValue: tracker)
+        _flow = State(initialValue: selectedFixture?.makeFlow(round: appModel.localRound) ?? NetworkSealAdapter.makeFlow(setup: setup, tracker: tracker))
         #else
-        _flow = State(initialValue: SealFlowModel())
+        let setup = NetworkSetup.load()
+        let tracker = NetworkSealTracker(relayHost: setup?.relayURL.host)
+        _networkTracker = State(initialValue: tracker)
+        _flow = State(initialValue: NetworkSealAdapter.makeFlow(setup: setup, tracker: tracker))
         #endif
         _model = State(initialValue: appModel)
         appearance = selectedAppearance
@@ -63,9 +76,12 @@ struct SlipApp: App {
         increaseContrast = contrast
     }
 
+    @State private var networkTracker: NetworkSealTracker
+
     var body: some Scene {
         WindowGroup {
             SlipRootView(model: model, flow: flow)
+                .environment(networkTracker)
                 .preferredColorScheme(model.screen.usesDarkCanvas ? .dark : appearance)
                 #if DEBUG
                 .modifier(DebugLocalFixtureLaunch(fixture: localFixture, model: model, flow: flow))
