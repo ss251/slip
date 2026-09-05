@@ -22,9 +22,7 @@ struct CrewsScreen: View {
                             name: "Saturday crew",
                             people: "5 people",
                             slips: "6 slips",
-                            palette: CrewMetrics.saturdayPalette,
-                            status: "Seal by Fri",
-                            sealState: false
+                            status: "Seal by Fri"
                         ) {
                             model.go(.crewDetail)
                         }
@@ -32,9 +30,7 @@ struct CrewsScreen: View {
                             name: "Office pool",
                             people: "9 people",
                             slips: "14 slips",
-                            palette: CrewMetrics.officePalette,
-                            status: "Opens 17:00",
-                            sealState: true
+                            status: "Opens 17:00"
                         ) {
                             model.inform("Only the Saturday crew is wired into this local preview.")
                         }
@@ -42,9 +38,7 @@ struct CrewsScreen: View {
                             name: "Book club",
                             people: "4 people",
                             slips: "2 slips",
-                            palette: CrewMetrics.bookPalette,
-                            status: "Quiet",
-                            sealState: nil
+                            status: "Quiet"
                         ) {
                             model.inform("Only the Saturday crew is wired into this local preview.")
                         }
@@ -91,16 +85,14 @@ private struct CrewSummaryRow: View {
     let name: String
     let people: String
     let slips: String
-    let palette: Int
     let status: String
-    let sealState: Bool?
     let action: () -> Void
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: SlipSpacing.medium) {
-                if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.art, palette: palette) }
+                if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.art, crewID: name) }
                 VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
                     HStack(alignment: .firstTextBaseline, spacing: SlipSpacing.small) {
                         Text(name).font(SlipFont.headline).foregroundStyle(SlipColor.ink)
@@ -376,7 +368,6 @@ struct YouScreen: View {
                         question: model.sampleQuestion,
                         crew: "Saturday crew",
                         detail: "Opens Fri 21:00",
-                        palette: CrewMetrics.saturdayPalette,
                         accessory: .sealed
                     ) {
                         model.go(.room)
@@ -386,7 +377,6 @@ struct YouScreen: View {
                         question: "Does the demo survive the all-hands?",
                         crew: "Office pool",
                         detail: "Yes · opens today 17:00",
-                        palette: CrewMetrics.officePalette,
                         accessory: .sealed
                     ) {
                         model.go(.room)
@@ -396,7 +386,6 @@ struct YouScreen: View {
                         question: "Will Raj actually ship this week?",
                         crew: "Saturday crew",
                         detail: "No · called it",
-                        palette: CrewMetrics.saturdayPalette,
                         accessory: .score("+1")
                     ) {
                         model.go(.verdict)
@@ -468,7 +457,6 @@ private struct ProfileHistoryRow: View {
     let question: String
     let crew: String
     let detail: String
-    let palette: Int
     let accessory: ProfileHistoryAccessory
     let action: () -> Void
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -479,14 +467,14 @@ private struct ProfileHistoryRow: View {
                 if typeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: SlipSpacing.medium) {
                         HStack {
-                            CrewArt(size: SlipSize.artSmall, palette: palette)
+                            CrewArt(size: SlipSize.artSmall, crewID: crew)
                             Spacer(minLength: SlipSpacing.standard)
                         }
                         historyLabels
                     }
                 } else {
                     HStack(spacing: SlipSpacing.medium) {
-                        CrewArt(size: SlipSize.artSmall, palette: palette)
+                        CrewArt(size: SlipSize.artSmall, crewID: crew)
                         historyLabels.frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -500,7 +488,7 @@ private struct ProfileHistoryRow: View {
 
     private var historyLabels: some View {
         VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-            CrewIdentityLine(crew: crew, palette: palette) { historyAccessory }
+            CrewIdentityLine(crew: crew) { historyAccessory }
             Text(question)
                 .font(SlipFont.headline)
                 .foregroundStyle(SlipColor.ink)
@@ -594,9 +582,6 @@ private struct CrewMember: Identifiable, Sendable {
 }
 
 private enum CrewMetrics {
-    static let saturdayPalette = 0
-    static let officePalette = 1
-    static let bookPalette = 2
     static let lastItemOffset = 1
     static let summaryRowHeight: CGFloat = 80
     static let profileStatContentHeight: CGFloat = 50

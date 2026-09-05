@@ -28,7 +28,8 @@ struct SealScreen: View {
             VStack(spacing: SlipSpacing.screen) {
                 SheetHeading(title: already ? "Already sealed" : proving ? "Sealing" : "Seal your pick", light: true)
                 ContextRow(detail: model.isPreview ? "Saturday crew · 3 of 5 sealed"
-                           : "\(model.localRound.crewName) · local proof only", light: true)
+                           : "\(model.localRound.crewName) · local proof only", light: true,
+                           crewID: model.isPreview ? PreviewContent.crew : model.localRound.crewName)
                 pickCard.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
                 if already {
                     explanation("You sealed this on this iPhone", "A sealed pick can’t be changed or sealed twice. That’s the whole point.")
@@ -53,7 +54,7 @@ struct SealScreen: View {
                 .padding(.bottom, SlipSpacing.large)
         }
         .safeAreaInset(edge: .bottom) { bottom }
-        .background { AmbientBackground() }
+        .background { AmbientBackground(crewID: model.isPreview ? PreviewContent.crew : model.localRound.crewName) }
         .foregroundStyle(SlipColor.onSeal)
         .preferredColorScheme(.dark)
         .onAppear { displayedRoundID = model.localRound.id }
@@ -189,10 +190,11 @@ struct SealScreen: View {
 }
 
 struct AmbientBackground: View {
+    var crewID: String = PreviewContent.crew
     var body: some View {
         ZStack(alignment: .top) {
             SlipColor.ambient
-            ArtField().frame(height: SlipArt.backdropHeight)
+            ArtField(crewID: crewID).frame(height: SlipArt.backdropHeight)
                 .opacity(SlipOpacity.ambientWash)
                 .mask(LinearGradient(colors: [SlipColor.onSeal, SlipColor.clear], startPoint: .top, endPoint: .bottom))
         }.ignoresSafeArea()
@@ -308,7 +310,7 @@ struct TicketScreen: View {
     private var ticketCard: some View {
         VStack(spacing: SlipSpacing.large) {
             HStack(spacing: SlipSpacing.small) {
-                CrewArt(size: SlipSize.largeIcon)
+                CrewArt(size: SlipSize.largeIcon, crewID: sealedDisplay?.crewName ?? PreviewContent.crew)
                 Text(sealedDisplay.map { "\($0.crewName) · sealed \(SlipDateText.weekdayTime($0.sealedAt))" } ?? "Saturday crew · sealed Tuesday 18:42")
                     .font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
             }

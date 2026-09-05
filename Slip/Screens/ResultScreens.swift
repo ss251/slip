@@ -916,7 +916,7 @@ private struct LocalResultScreen: View {
             .padding(.bottom, SlipSpacing.section)
         }
         .scrollIndicators(.hidden)
-        .background { ArtBackdrop() }
+        .background { ArtBackdrop(crewID: model.localRound.crewName) }
         .safeAreaInset(edge: .bottom, spacing: SlipSpacing.zero) {
             BottomActions {
                 actions

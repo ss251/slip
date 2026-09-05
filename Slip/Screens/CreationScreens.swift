@@ -10,14 +10,13 @@ struct NewSlipScreen: View {
     @State private var sealDate = CreationDefaults.nextFriday(hour: CreationDefaults.sealHour)
     @State private var openDate = CreationDefaults.nextFriday(hour: CreationDefaults.openHour)
     @State private var editedDate: CreationDateField?
-    @State private var artPalette = CreationDefaults.initialPalette
 
     var body: some View {
         ScrollView {
             VStack(spacing: SlipSpacing.large) {
                 VStack(spacing: SlipSpacing.small) {
                     creationHeader
-                    artPicker
+                    crewArt
                 }
 
                 TextField("Ask your crew something", text: $draftQuestion, axis: .vertical)
@@ -64,23 +63,8 @@ struct NewSlipScreen: View {
         FormHeading(title: "New slip", cancel: model.back)
     }
 
-    private var artPicker: some View {
-        CrewArt(size: CreationMetrics.newSlipArtSize, palette: artPalette)
-            .overlay(alignment: .bottomTrailing) {
-                Button {
-                    artPalette = (artPalette + CreationDefaults.paletteIncrement) % CreationDefaults.paletteCount
-                } label: {
-                    Image(systemName: "shuffle")
-                        .font(SlipFont.smallChromeIcon)
-                        .foregroundStyle(SlipColor.ink)
-                        .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
-                        .background(SlipColor.card, in: Circle())
-                        .shadow(color: SlipShadow.cardColor, radius: SlipShadow.cardRadius, y: SlipShadow.cardY)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Choose different crew art")
-                .offset(x: SlipSpacing.small, y: SlipSpacing.small)
-            }
+    private var crewArt: some View {
+        CrewArt(size: CreationMetrics.newSlipArtSize)
     }
 
     @ViewBuilder private var sideEditors: some View {
@@ -393,9 +377,6 @@ private enum CreationDefaults {
     static let sealHour = 20
     static let openHour = 21
     static let friday = 6
-    static let initialPalette = 0
-    static let paletteIncrement = 1
-    static let paletteCount = 3
 
     static func nextFriday(hour: Int) -> Date {
         var components = DateComponents()

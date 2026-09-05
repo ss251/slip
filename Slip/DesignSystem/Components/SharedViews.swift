@@ -23,9 +23,9 @@ struct SlipCard<Content: View>: View {
 
 struct CrewArt: View {
     var size: CGFloat = SlipSize.art
-    var palette: Int = 0
+    var crewID: String = PreviewContent.crew
     var body: some View {
-        ArtField(palette: palette)
+        ArtField(crewID: crewID)
             .frame(width: size, height: size)
             .clipShape(RoundedRectangle(cornerRadius: size == SlipSize.art ? SlipRadius.crest : size / SlipArt.cornerDivisor))
             .overlay(RoundedRectangle(cornerRadius: size == SlipSize.art ? SlipRadius.crest : size / SlipArt.cornerDivisor)
@@ -35,12 +35,10 @@ struct CrewArt: View {
 }
 
 struct ArtField: View {
-    var palette: Int = 0
+    var crewID: String = PreviewContent.crew
     var body: some View {
         GeometryReader { geometry in
-            let colors = palette == 1 ? [SlipColor.artMint, SlipColor.artPeach, SlipColor.artYellow]
-                : palette == 2 ? [SlipColor.artPurple, SlipColor.artPink, SlipColor.artGreen]
-                : [SlipColor.artPink, SlipColor.artYellow, SlipColor.artBlue]
+            let colors = SlipColor.artPalettes[SlipArt.paletteIndex(for: crewID)]
             ZStack {
                 SlipColor.onSeal
                 RadialGradient(colors: [colors[0], SlipColor.clear], center: .topLeading,
@@ -55,11 +53,12 @@ struct ArtField: View {
 }
 
 struct ArtBackdrop: View {
+    var crewID: String = PreviewContent.crew
     @Environment(\.colorScheme) private var colorScheme
     var body: some View {
         ZStack(alignment: .top) {
             SlipColor.background
-            ArtField()
+            ArtField(crewID: crewID)
                 .frame(height: SlipArt.backdropHeight)
                 .opacity(colorScheme == .dark ? SlipOpacity.subtle : SlipOpacity.muted)
                 .mask(LinearGradient(colors: [SlipColor.onSeal, SlipColor.clear], startPoint: .top, endPoint: .bottom))
@@ -70,7 +69,6 @@ struct ArtBackdrop: View {
 /// The shared who/what/when grammar keeps status attached to identity as text grows.
 struct CrewIdentityLine<Status: View>: View {
     let crew: String
-    var palette: Int = 0
     @ViewBuilder var status: Status
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -80,7 +78,7 @@ struct CrewIdentityLine<Status: View>: View {
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: SlipSpacing.small))
         layout {
             HStack(spacing: SlipSpacing.tiny) {
-                CrewArt(size: SlipSize.artIdentity, palette: palette)
+                CrewArt(size: SlipSize.artIdentity, crewID: crew)
                 Text(crew).font(SlipFont.footnote).foregroundStyle(SlipColor.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -250,11 +248,12 @@ struct FormHeading: View {
 struct ContextRow: View {
     var detail = "Saturday crew · 3 of 5 sealed"
     var light = false
+    var crewID: String = PreviewContent.crew
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(AppModel.self) private var model
     var body: some View {
         HStack(spacing: SlipSpacing.medium) {
-            if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.artSmall) }
+            if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.artSmall, crewID: crewID) }
             VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
                 Text(model.sampleQuestion).font(SlipFont.headline).fixedSize(horizontal: false, vertical: true)
                 Text(detail).font(SlipFont.footnote).foregroundStyle(light ? SlipColor.onTicket : SlipColor.secondary)
@@ -345,6 +344,18 @@ struct BottomActions<Content: View>: View {
 }
 
 enum SlipArt {
+    // The current local UI has public crew names, not persisted crew IDs. Hash those
+    // exact UTF-8 keys with wrapping arithmetic so identity survives every launch.
+    static func identityHash(for crewID: String) -> UInt64 {
+        crewID.utf8.reduce(UInt64(5381)) { hash, byte in
+            (hash &* 33) &+ UInt64(byte)
+        }
+    }
+
+    static func paletteIndex(for crewID: String) -> Int {
+        Int(identityHash(for: crewID) % UInt64(SlipColor.artPalettes.count))
+    }
+
     static let cornerDivisor: CGFloat = 4
     static let radiusRatio: CGFloat = 0.8
     static let backdropHeight: CGFloat = 360

@@ -63,7 +63,6 @@ struct HomeScreen: View {
                     question: "Does the demo survive the all-hands?",
                     crew: "Office pool",
                     detail: "Opens 17:00",
-                    palette: HomeMetrics.officePalette,
                     state: .sealed
                 ) {
                     model.go(.room)
@@ -77,7 +76,6 @@ struct HomeScreen: View {
                 question: "Will Raj actually ship this week?",
                 crew: "Saturday crew",
                 detail: "He didn’t · 4 of 5 called it",
-                palette: HomeMetrics.settledPalette,
                 state: .score("+1")
             ) {
                 model.go(.verdict)
@@ -235,7 +233,6 @@ private struct HomeCompactSlipRow: View {
     let question: String
     let crew: String
     let detail: String
-    let palette: Int
     let state: HomeRowState
     let action: () -> Void
 
@@ -245,9 +242,9 @@ private struct HomeCompactSlipRow: View {
                 let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: SlipSpacing.medium))
                     : AnyLayout(HStackLayout(spacing: SlipSpacing.medium))
                 layout {
-                    if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.art, palette: palette) }
+                    if !typeSize.isAccessibilitySize { CrewArt(size: SlipSize.art, crewID: crew) }
                     VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-                        CrewIdentityLine(crew: crew, palette: palette) { rowStatus }
+                        CrewIdentityLine(crew: crew) { rowStatus }
                         Text(question)
                             .font(SlipFont.headline)
                             .foregroundStyle(SlipColor.ink)
@@ -445,8 +442,6 @@ private struct HowStepContent: Identifiable, Sendable {
 }
 
 private enum HomeMetrics {
-    static let officePalette = 1
-    static let settledPalette = 0
     static let emptyCopyWidth: CGFloat = 320
     static let emptyCardWidth: CGFloat = 144
     static let emptyCardHeight: CGFloat = 112

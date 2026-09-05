@@ -19,13 +19,20 @@ enum SlipColor {
     static let ticketSecondary = fixed(0xB6B3BB)
     static let clear = Color.clear
 
-    static let artPink = fixed(0xF2BBD5)
-    static let artYellow = fixed(0xF4DF83)
-    static let artBlue = fixed(0xAFCDF4)
-    static let artMint = fixed(0x9DE1C8)
-    static let artPeach = fixed(0xF4C292)
-    static let artPurple = fixed(0xB7B1F4)
-    static let artGreen = fixed(0xB9D9B0)
+    // Decorative crew identity: amber, blue and violet; semantic red/green are excluded.
+    // Ten palettes keep the current Saturday, Office and Book identities distinct.
+    static let artPalettes: [[Color]] = [
+        [fixed(0x7EA9DE), fixed(0xCBB8ED), fixed(0xE8D1A2)],
+        [fixed(0xBDACEC), fixed(0x8BA7D5), fixed(0xD9BA88)],
+        [fixed(0xD9AC5B), fixed(0xF1DEB4), fixed(0x9A82C7)],
+        [fixed(0x9C91D6), fixed(0xD7C8F0), fixed(0x6C91B8)],
+        [fixed(0x9FA6CF), fixed(0xD1BF91), fixed(0xB7A0D6)],
+        [fixed(0x7667B3), fixed(0xB19ADF), fixed(0xD9C3ED)],
+        [fixed(0xA2BCE2), fixed(0xD7C4A7), fixed(0x958BC4)],
+        [fixed(0x5C8FCB), fixed(0xAFC9EA), fixed(0x6A75B5)],
+        [fixed(0xAA82C1), fixed(0xCEC1EA), fixed(0xDBBB87)],
+        [fixed(0xC7B080), fixed(0xAD9EC9), fixed(0x8099C3)]
+    ]
 
     static let shadow = adaptive(light: 0x16161A, dark: 0x000000)
     static let contrastBorder = adaptive(light: 0x77777E, dark: 0xC7C7CC)
