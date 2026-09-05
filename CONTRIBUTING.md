@@ -8,6 +8,8 @@ Read the [product](.claude/docs/product.md) and [design](.claude/docs/design.md)
 
 Follow the README's build-input and parameter-staging instructions. The required native archive and generated artifacts are not all distributed in a fresh clone. Report missing inputs honestly; do not substitute placeholder proofs or describe skipped native checks as passing.
 
+The [CI app-test job](.github/workflows/ci.yml) checks for `MidnightKit/Vendor/libslip_prove_ffi.a`, the six circuits' ZKIR/prover/verifier files under `contracts/build/`, and staged k13/k14 public parameters under `.build/app-proof-params/`. These inputs are not tracked, and the Rust archive's source lives outside this repository. A fresh clone therefore warns and skips app tests; a green workflow does **not** establish that the app suite passed. The app target exists in `project.yml`; the ignored `Slip.xcodeproj` is generated with XcodeGen 2.45+ when the inputs are available. CI does not download or fabricate them. Run the app suite locally with the matching inputs and include its actual passed-count line.
+
 Install the repository hooks from the checkout root:
 
 ```sh

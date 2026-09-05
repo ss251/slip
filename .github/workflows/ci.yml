@@ -80,10 +80,39 @@ jobs:
           cd MidnightKit && xcodebuild test -scheme MidnightKit \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}"
 
-      - name: App tests (skips until the app target exists)
+      - name: Check app test build inputs
+        id: app-inputs
         run: |
-          if [ ! -d Slip.xcodeproj ] && [ ! -d Slip.xcworkspace ]; then
-            echo "no app target yet — skipping (pre-scaffold)"; exit 0; fi
+          # project.yml defines the app; Slip.xcodeproj is generated and ignored.
+          # Fresh clones lack the external native archive and local proof artifacts.
+          missing=0
+          require_input() {
+            if [ ! -f "$1" ]; then
+              printf 'Missing app test input: %s\n' "$1"
+              missing=1
+            fi
+          }
+          require_input MidnightKit/Vendor/libslip_prove_ffi.a
+          for circuit in enrollMember createSlip sealPick reveal settle dispute; do
+            require_input "contracts/build/zkir/$circuit.zkir"
+            require_input "contracts/build/keys/$circuit.prover"
+            require_input "contracts/build/keys/$circuit.verifier"
+          done
+          require_input .build/app-proof-params/bls_midnight_2p13
+          require_input .build/app-proof-params/bls_midnight_2p14
+          if [ "$missing" -ne 0 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=App tests not run::Required native archive, generated contract artifacts or staged public parameters are missing. Fresh clones do not contain these inputs; app tests are NOT covered by CI. See CONTRIBUTING.md and README.md (Build and test)."
+            echo "App tests skipped: required build inputs are missing (listed in the input-check log). This is not a passing app test run. See CONTRIBUTING.md and README.md (Build and test)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: App tests
+        if: steps.app-inputs.outputs.ready == 'true'
+        run: |
+          command -v xcodegen >/dev/null || { echo "::error::XcodeGen 2.45+ is required to generate the app project."; exit 1; }
+          xcodegen generate
           xcodebuild -scheme Slip -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" test
 
   # per skill §13: local-network e2e runs on main only, not every PR
