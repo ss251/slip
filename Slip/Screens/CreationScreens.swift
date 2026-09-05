@@ -171,6 +171,8 @@ struct NewSlipScreen: View {
 }
 
 private struct SideEditor: View {
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
     let label: String
     @Binding var text: String
     let expands: Bool
@@ -188,6 +190,11 @@ private struct SideEditor: View {
                 minHeight: SlipSize.minimumTap
             )
             .background(SlipColor.fill, in: Capsule())
+            .overlay {
+                if contrast == .increased || accessibility.increaseContrast {
+                    Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.standard)
+                }
+            }
             .accessibilityLabel(label)
     }
 }

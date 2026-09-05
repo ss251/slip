@@ -137,6 +137,13 @@ struct SealScreen: View {
                         .frame(maxWidth: .infinity, minHeight: SlipSize.compactButtonHeight)
                         .background(model.selectedSide == side ? SlipColor.onSeal : (reduceTransparency || accessibility.reduceTransparency) ? SlipColor.ambient : SlipColor.onSeal.opacity(SlipOpacity.subtle),
                                     in: RoundedRectangle(cornerRadius: SlipRadius.control))
+                        .overlay {
+                            if contrast == .increased || accessibility.increaseContrast {
+                                RoundedRectangle(cornerRadius: SlipRadius.control)
+                                    .stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
+                                    .environment(\.colorScheme, .dark)
+                            }
+                        }
                 }.buttonStyle(SlipPressStyle()).environment(\.colorScheme, .light)
                     .accessibilityAddTraits(model.selectedSide == side ? .isSelected : [])
             }
@@ -158,6 +165,12 @@ struct SealScreen: View {
                 Text(hold.began == nil ? "Hold to seal" : "Keep holding…").font(SlipFont.headline)
                     .frame(maxWidth: .infinity, minHeight: SlipSize.buttonHeight)
                     .background(SlipColor.seal, in: Capsule()).contentShape(Capsule())
+                    .overlay {
+                        if contrast == .increased || accessibility.increaseContrast {
+                            Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
+                                .environment(\.colorScheme, .dark)
+                        }
+                    }
                     .scaleEffect(hold.began != nil && !(reduceMotion || accessibility.reduceMotion) ? SlipMotion.pressScale : SlipOpacity.opaque)
                     .animation(.easeOut(duration: SlipMotion.pressDuration), value: hold.began != nil)
                     .onLongPressGesture(minimumDuration: SlipMotion.holdDuration, maximumDistance: SlipSize.minimumTap,

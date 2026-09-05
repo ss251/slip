@@ -3,6 +3,8 @@ import SwiftUI
 struct HomeScreen: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
 
     let firstRun: Bool
     @State private var selection: HomeFeedSelection = .upcoming
@@ -44,6 +46,11 @@ struct HomeScreen: View {
                     .foregroundStyle(SlipColor.ink)
                     .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
                     .background(SlipColor.fill, in: Circle())
+                    .overlay {
+                        if contrast == .increased || accessibility.increaseContrast {
+                            Circle().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
+                        }
+                    }
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Open your profile")
@@ -174,6 +181,8 @@ private struct HomeFeedPicker: View {
 
 private struct HomeHeroCard: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
     let action: () -> Void
 
     var body: some View {
@@ -189,6 +198,12 @@ private struct HomeHeroCard: View {
                             .padding(.horizontal, SlipSpacing.standard)
                             .padding(.vertical, SlipSpacing.medium)
                             .background(SlipColor.onSeal, in: Capsule())
+                            .overlay {
+                                if contrast == .increased || accessibility.increaseContrast {
+                                    Capsule().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.standard)
+                                        .environment(\.colorScheme, .light)
+                                }
+                            }
                             .padding(SlipSpacing.medium)
                             .frame(maxWidth: .infinity, minHeight: SlipSize.heroBannerHeight, alignment: .topLeading)
                             .background { ArtField() }

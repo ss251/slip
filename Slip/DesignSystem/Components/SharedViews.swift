@@ -172,6 +172,8 @@ struct PillButton: View {
 }
 
 struct RoundButton: View {
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
     let symbol: String
     let label: String
     var action: () -> Void
@@ -180,6 +182,11 @@ struct RoundButton: View {
             Image(systemName: symbol).font(SlipFont.chromeIcon)
                 .frame(width: SlipSize.minimumTap, height: SlipSize.minimumTap)
                 .foregroundStyle(SlipColor.ink).background(SlipColor.fill, in: Circle())
+                .overlay {
+                    if contrast == .increased || accessibility.increaseContrast {
+                        Circle().stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
+                    }
+                }
         }.buttonStyle(SlipPressStyle()).accessibilityLabel(label)
     }
 }
