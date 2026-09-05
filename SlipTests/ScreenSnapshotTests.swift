@@ -55,9 +55,14 @@ struct ScreenSnapshotTests {
         }
         let foreground = luminance([242.0 / 255, 242.0 / 255, 247.0 / 255])
         var minimumRatio = Double.infinity
-        // Left canvas gutter avoids all private/synthetic pick text and controls.
-        for y in stride(from: 160, to: cg.height - 100, by: 20) {
-            let offset = (y * cg.width + 4) * 4
+        // Preserve the same point-space gutter and coverage at any render scale.
+        // The gutter avoids all private/synthetic pick text and controls.
+        let gutterX = Int(2 * image.scale)
+        let startY = Int(80 * image.scale)
+        let endY = cg.height - Int(50 * image.scale)
+        let sampleStep = max(1, Int(10 * image.scale))
+        for y in stride(from: startY, to: endY, by: sampleStep) {
+            let offset = (y * cg.width + gutterX) * 4
             let background = luminance((0..<3).map { Double(rgba[offset + $0]) / 255 })
             minimumRatio = min(minimumRatio, (foreground + 0.05) / (background + 0.05))
         }
@@ -85,13 +90,20 @@ struct ScreenSnapshotTests {
         host.view.layoutIfNeeded()
         try await Task.sleep(for: .milliseconds(150))
         let format = UIGraphicsImageRendererFormat()
-        format.scale = 2
+        format.scale = 1
+        format.preferredRange = .standard
         let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
         }
         window.isHidden = true
         window.rootViewController = nil
         previous?.makeKeyAndVisible()
+        let cg = try #require(image.cgImage)
+        #expect(image.scale == 1)
+        #expect(image.size == size)
+        #expect(cg.width == Int(size.width))
+        #expect(cg.height == Int(size.height))
+        #expect(cg.bitsPerComponent == 8)
         return image
     }
 
