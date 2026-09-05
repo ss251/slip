@@ -160,7 +160,7 @@ struct SealedRoomScreen: View {
             .contextMenu {
                 Button("Preview opening") { model.go(.opening) }
             }
-            .accessibilityHint("Touch and hold to preview opening locally")
+            .modifier(ResultPreviewAccessibility(action: .opening))
 #else
         ResultStatusChip(text: countdownText)
 #endif
@@ -262,7 +262,7 @@ struct OpeningScreen: View {
                     Button("Preview call sheet") { model.go(.settle) }
                 }
             }
-            .accessibilityHint("Touch and hold for the next local preview state")
+            .modifier(ResultPreviewAccessibility(action: mode == .opening ? .everyoneOpened : .callSheet))
 #else
         ResultStatusChip(text: statusText, symbol: "circle.fill")
 #endif
@@ -404,7 +404,7 @@ struct VerdictScreen: View {
             .contextMenu {
                 Button("Preview standings") { model.go(.standings) }
             }
-            .accessibilityHint("Touch and hold to preview standings locally")
+            .modifier(ResultPreviewAccessibility(action: .standings))
 #else
         ScreenHeader(title: "It rained.", subtitle: "SATURDAY CREW · ANA CALLED IT")
 #endif
@@ -1481,6 +1481,8 @@ private struct ResultRosterRow: View {
         .padding(.vertical, rowVerticalPadding)
         .frame(minHeight: rowMinimumHeight)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(ResultAccessibility.roster(name: item.name, detail: item.detail,
+            value: item.value, valueDetail: item.valueDetail, score: item.score, sealed: item.sealed))
     }
 
     private func detailedSeal(sealed: Bool, detail: String) -> some View {
@@ -1665,16 +1667,18 @@ private struct VerdictBars: View {
                 VStack(spacing: SlipSpacing.small) {
                     VerdictBarHeading(side: "Yes", detail: "3 picks", calledIt: true)
                     ResultBar(value: satOut ? ResultLayout.satOutYesShare : ResultLayout.normalYesShare, color: SlipColor.win)
-                        .accessibilityLabel("Yes")
-                        .accessibilityValue("3 picks, called it")
+                        .accessibilityHidden(true)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(ResultAccessibility.verdict(side: "Yes", picks: 3, calledIt: true))
 
                 VStack(spacing: SlipSpacing.small) {
                     VerdictBarHeading(side: "No", detail: satOut ? "1 pick · 1 sat out" : "2 picks")
                     ResultBar(value: satOut ? ResultLayout.satOutNoShare : ResultLayout.normalNoShare, color: SlipColor.secondary)
-                        .accessibilityLabel("No")
-                        .accessibilityValue(satOut ? "1 pick, 1 sat out" : "2 picks")
+                        .accessibilityHidden(true)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(ResultAccessibility.verdict(side: "No", picks: satOut ? 1 : 2, satOut: satOut ? 1 : 0))
             }
             .padding(.vertical, SlipSpacing.small)
             .foregroundStyle(SlipColor.ink)
