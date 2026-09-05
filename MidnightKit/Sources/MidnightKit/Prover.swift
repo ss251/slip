@@ -131,6 +131,60 @@ public actor Prover {
         }
     }
 
+    /// A proved, unbalanced transaction ready for a wallet to balance, sign and submit.
+    public struct ProvedTransaction: Sendable, Equatable {
+        /// Tagged ledger serialisation of the proved transaction — what leaves the device.
+        public let data: Data
+        public let duration: Duration
+    }
+
+    /// Assembles and proves a call transaction on this device.
+    ///
+    /// This is the network path. `proofData` comes from `ContractRuntime`; everything else
+    /// is public chain context: the deployed contract's address, its current on-chain
+    /// state (tagged `ContractState` bytes from the indexer) and block time. The native
+    /// bridge builds the ledger-8 call prototype, partitions the transcript, derives the
+    /// transaction binding input and proves with the bundled keys — the same steps the
+    /// proof server and midnight-js perform, minus the proof server. The witness and the
+    /// private transcript never leave process memory; the returned bytes are the proved,
+    /// unbalanced transaction, which a wallet (holding the fee keys) balances and submits.
+    public func buildProvedCallTransaction(
+        circuit: String,
+        proofData: String,
+        networkID: String,
+        contractAddressHex: String,
+        contractState: Data,
+        blockTime: UInt64,
+        ttl: UInt64
+    ) async throws -> ProvedTransaction {
+        try artifacts.validate(circuit: circuit)
+        let verifier = artifacts.keysDirectory.appendingPathComponent("\(circuit).verifier").path
+        guard FileManager.default.fileExists(atPath: verifier) else { throw MidnightKitError.provingKeyMissing(circuit: circuit) }
+        let (zkir, keys, params) = (artifacts.circuitsDirectory.path, artifacts.keysDirectory.path, artifacts.parametersDirectory.path)
+        return try await withCheckedThrowingContinuation { continuation in
+            let thread = Thread {
+                let started = ContinuousClock.now
+                var ptr: UnsafeMutablePointer<UInt8>? = nil; var len = 0
+                let rc = contractState.withUnsafeBytes { state -> Int32 in
+                    proofData.withCString { pd in networkID.withCString { net in contractAddressHex.withCString { addr in
+                    circuit.withCString { entry in verifier.withCString { vk in zkir.withCString { z in keys.withCString { k in params.withCString { p in
+                        slip_build_proved_call_tx(pd, net, addr, entry, vk, state.bindMemory(to: UInt8.self).baseAddress, state.count,
+                                                  blockTime, ttl, z, k, p, &ptr, &len)
+                    } } } } } } } }
+                }
+                guard rc == 0, let ptr else {
+                    continuation.resume(throwing: MidnightKitError.from(code: rc, circuit: circuit)); return
+                }
+                let data = Data(bytes: ptr, count: len)
+                slip_free_bytes(ptr, len)
+                continuation.resume(returning: ProvedTransaction(data: data, duration: ContinuousClock.now - started))
+            }
+            thread.stackSize = 64 * 1024 * 1024
+            thread.qualityOfService = .userInitiated
+            thread.start()
+        }
+    }
+
     /// Confirms the linked archive is ours and not one of the earlier spike libraries.
     public nonisolated static func linkedLibraryIsMidnightKit() -> Bool {
         slip_prove_ping() == 44

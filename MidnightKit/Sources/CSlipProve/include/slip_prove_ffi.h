@@ -39,3 +39,12 @@ int32_t  slip_prove_preimage_bound(const char *ir_path, const char *params_dir, 
                                    const char *pk_path, const char *binding_input_hex,
                                    uint64_t *out_keygen_ms, uint64_t *out_prove_ms,
                                    uint8_t **out_proof, size_t *out_proof_len);
+/* Native transaction assembly: proofData + public chain context (tagged ContractState bytes) →
+   malloc'd tagged proved-UNBALANCED ledger-8 Transaction in *out_tx (free with slip_free_bytes).
+   The ledger derives the call's binding input itself and drives our prover. 0 = ok, -2 = error. */
+int32_t  slip_build_proved_call_tx(const char *proofdata_json, const char *network_id, const char *address_hex,
+                                   const char *entry_point, const char *verifier_path,
+                                   const uint8_t *state_bytes, size_t state_len,
+                                   uint64_t block_secs, uint64_t ttl_secs,
+                                   const char *zkir_dir, const char *keys_dir, const char *params_dir,
+                                   uint8_t **out_tx, size_t *out_tx_len);

@@ -37,6 +37,14 @@ priv = init.currentPrivateState;
 // enrollment first: the contract locks the roster once a slip is open
 await call(STEWARD, 0n, 'enrollMember', NOW, pureCircuits.memberIdOf(ALICE));
 await call(STEWARD, 0n, 'createSlip', NOW + 10, new Uint8Array(32).fill(9), BigInt(DEADLINE));
+// The ContractState the sealPick call runs against (after enrollMember + createSlip):
+// public chain context the native tx assembly builds from. Operations come from the
+// deploy-time state; data is the latest ledger state.
+{
+  const cs = init.currentContractState; cs.data = state;
+  writeFileSync('build/sealPick.state.bin', Buffer.from(cs.serialize()));
+  console.log('wrote build/sealPick.state.bin');
+}
 const res = await call(ALICE, 1n, 'sealPick', NOW + 600);
 
 const pd = res.proofData;

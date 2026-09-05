@@ -114,4 +114,22 @@ struct ContractRuntimeTests {
             _ = try await prover.prove(circuit: "sealPick", proofData: json, bindingInput: "0xzz")
         }
     }
+
+    @Test("the device assembles and proves a bound call transaction from proofData + public state")
+    func assemblesProvedTransaction() async throws {
+        let rt = try ContractRuntime()
+        let json = try rt.evaluate(Self.sealPickDriver)
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("contracts/build")
+        let state = try Data(contentsOf: root.appendingPathComponent("sealPick.state.bin"))
+        let prover = Prover(artifacts: Self.artifacts)
+        let tx = try await prover.buildProvedCallTransaction(
+            circuit: "sealPick", proofData: json, networkID: "undeployed",
+            contractAddressHex: String(repeating: "11", count: 32), contractState: state,
+            blockTime: 1_788_000_600, ttl: 1_788_002_400)
+        print("ASSEMBLED proved tx: \(tx.data.count) bytes in \(tx.duration)")
+        #expect(tx.data.count > 4480)
+        // Tagged ledger envelope: "midnight:transaction[…" prefix
+        #expect(String(decoding: tx.data.prefix(20), as: UTF8.self).hasPrefix("midnight:transaction"))
+    }
 }

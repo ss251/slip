@@ -249,3 +249,21 @@ two bindings → two different 4,480-byte proofs (host test `binding_changes_the
 kit test `bindingInputIsInTheStatement`, gate 9/9). The remaining gap for a phone-only
 submission is assembling the unproven transaction on device so the binding is known
 before proving — that is the native tx-assembly work, tracked in HANDOFF.md.
+
+## Native transaction assembly on device (2026-09-05)
+
+`Prover.buildProvedCallTransaction(circuit:proofData:networkID:contractAddressHex:
+contractState:blockTime:ttl:)` → `ProvedTransaction` (tagged ledger bytes). Backed by
+`slip_build_proved_call_tx` in `slip-prove-ffi/src/tx_assembly.rs`: `proofData` + the
+deployed contract's tagged `ContractState` (from the indexer) become a ledger-8
+`PrePartitionContractCall`; `StandardTransaction::add_calls` partitions the transcript and
+builds the preimage; `Transaction::prove` derives the binding input and drives OUR prover
+through `ProvingProvider`. The output is a proved, UNBALANCED transaction — a wallet
+(holding the fee keys) balances, signs and submits (prove → balance → bind). Nothing
+private leaves memory; no proof server anywhere. Evidence: host test
+`builds_and_proves_a_bound_call_tx` (5,238 bytes, 1.49 s); kit test
+`assemblesProvedTransaction` on the iPhone 17 Pro simulator (5,236 bytes, 0.96 s; gate
+10/10). Host CLI `slip-prove assemble …` produces the same bytes for the Node referee.
+The ffi crate now has a local git repo on the SSD (`83d02ca`) and a tarball under
+`handoff/evidence/`. Known follow-up: Thread Performance Checker priority-inversion
+warnings from the `.userInitiated` prover thread waiting on rayon/blst workers.
