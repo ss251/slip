@@ -258,20 +258,37 @@ No contract address or crew state is fetched from a network.
 
 `LocalSealingService` owns execute → prove in an actor. The device secret, choice,
 runtime proof-input JSON and private display snapshot stay in process memory;
-none are logged, serialized, saved, exported or submitted. Salt remains derived
+none are logged, written to disk, exported or submitted. Salt remains derived
 inside the existing circuit. Only the proof bytes, public commitment, round ID,
 question commitment and real execution/key-load/prove durations form the public
 receipt. A separate private display snapshot prevents a later draft edit from
 relabeling an already-sealed pick. Results are cached by immutable local round
 identity, not by a global one-shot flag.
 
-The presentation model owns its task. Departing the sealing screen or inactivating
-the scene invalidates
-late UI completion; native proving may finish and be cached by the actor, but
+The presentation model owns its task. Departing the active flow or inactivating
+the scene invalidates late UI completion; native proving may finish and be cached by the actor, but
 cannot navigate a departed screen. This is session-only: terminating the app loses
-the witness and no later reveal is promised. Preview rosters and results are
+the witness, so that session cannot be revealed after relaunch. Preview rosters and results are
 synthetic. Wallet, submission, indexer, persistent storage and verified network
 reveal remain separate, owner-scoped work.
+
+The same actor now proves all six steps: enroll → create → seal → reveal → settle
+→ optional dispute. It retains the original device secret, choice, steward secret
+and seal-time metadata for this session. Reveal accepts only a round ID, never a
+new pick; the existing circuit derives the original salt and verifies the opening.
+Each operation uses a fresh synchronous runtime to replay its accepted prefix,
+then proves only the new step. Private proof-input JSON crosses the app's in-memory
+execute/prove boundary; no JavaScript object crosses an actor suspension. Failed
+execution is discarded rather than assuming native context rollback.
+
+Accepted public ledger fields (opening, tallies, outcome, disputer identity) drive
+the local reveal/verdict/standings views. These are deliberately public **after**
+the relevant circuit succeeds and is proved; raw native errors remain sanitized.
+The sample advances caller-supplied execution time to each legal window, not the
+device clock, and never submits a proof. Per-step receipts expose only circuit name,
+preparation/key/proving durations and byte count. Debug screenshot fixtures are
+clearly labelled, synthetic, and execute no circuits; flags cannot carry witnesses.
+Sources and exact mirrored Node tests: `docs/phase4-sources.md`.
 
 Everything that intentionally becomes public, in one place. Update this list with every `disclose()`:
 

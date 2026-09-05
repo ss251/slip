@@ -9,6 +9,10 @@ import SwiftUI
 @MainActor @Observable
 final class SealFlowModel {
     typealias SealOperation = @Sendable (LocalRound, UInt8) async throws -> LocalSealResult
+    typealias RoundOperation = @Sendable (UUID, LocalRoundAction) async throws -> LocalRoundResult
+    typealias RoundReadOperation = @Sendable (UUID) async -> LocalRoundResult?
+
+    enum LocalRoundAction: Sendable { case reveal, settle(UInt8), dispute }
 
     enum Stage: Equatable { case choosing, proving, sealed, failed }
 
@@ -16,12 +20,19 @@ final class SealFlowModel {
     private(set) var result: LocalSealResult?
     private(set) var failure: AppSealError?
     private(set) var activeRoundID: UUID?
+    private(set) var roundResult: LocalRoundResult?
+    private(set) var roundFailure: AppSealError?
+    private(set) var isRoundBusy = false
 
     var receipt: LocalSealReceipt? { result?.receipt }
     var sealedDisplay: LocalSealedDisplay? { result?.privateDisplay }
 
     @ObservationIgnored private let sealOperation: SealOperation
+    @ObservationIgnored private let roundOperation: RoundOperation
+    @ObservationIgnored private let readRound: RoundReadOperation
     @ObservationIgnored private var sealTask: Task<Void, Never>?
+    @ObservationIgnored private var roundTask: Task<Void, Never>?
+    @ObservationIgnored private var roundToken: UUID?
     @ObservationIgnored private var operationToken: UUID?
     @ObservationIgnored private var feedbackRoundIDs: Set<UUID> = []
 
@@ -32,22 +43,42 @@ final class SealFlowModel {
         sealOperation = { round, choice in
             try await service.seal(round: round, choice: choice)
         }
+        readRound = { await service.currentResult(roundID: $0) }
+        roundOperation = { id, action in
+            switch action {
+            case .reveal: try await service.reveal(roundID: id)
+            case .settle(let outcome): try await service.settle(roundID: id, outcome: outcome)
+            case .dispute: try await service.dispute(roundID: id)
+            }
+        }
     }
 
-    init(sealOperation: @escaping SealOperation) {
+    convenience init(sealOperation: @escaping SealOperation) {
+        self.init(sealOperation: sealOperation, roundOperation: { _, _ in throw AppSealError.unexpected })
+    }
+
+    init(
+        sealOperation: @escaping SealOperation,
+        roundOperation: @escaping RoundOperation,
+        readRound: @escaping RoundReadOperation = { _ in nil }
+    ) {
         self.sealOperation = sealOperation
+        self.roundOperation = roundOperation
+        self.readRound = readRound
     }
 
     /// Captures the immutable round and choice synchronously, then owns the task that
     /// performs the proof. Views observe `stage`; this model never navigates itself.
     func beginSeal(round: LocalRound, choice: UInt8) {
-        guard stage != .proving else { return }
+        guard stage != .proving, !isRoundBusy else { return }
 
         if let existing = result, existing.receipt.roundID == round.id {
             guard metadataMatches(existing, round: round) else {
                 operationToken = nil
                 activeRoundID = round.id
                 result = nil
+                roundResult = nil
+                roundFailure = nil
                 failure = .roundIdentityConflict
                 stage = .failed
                 return
@@ -63,15 +94,23 @@ final class SealFlowModel {
         operationToken = token
         activeRoundID = round.id
         result = nil
+        roundResult = nil
+        roundFailure = nil
         failure = nil
         stage = .proving
 
         let operation = sealOperation
+        let read = readRound
         sealTask = Task { @MainActor [weak self] in
             do {
                 let sealed = try await operation(round, choice)
+                let localResult = await read(round.id)
                 guard !Task.isCancelled else { return }
                 self?.finish(sealed, expectedRound: round, token: token)
+                if self?.operationToken == token, self?.stage == .sealed,
+                   localResult?.round == round {
+                    self?.roundResult = localResult
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 let safeError = (error as? AppSealError) ?? .unexpected
@@ -88,6 +127,10 @@ final class SealFlowModel {
         operationToken = nil
         sealTask?.cancel()
         sealTask = nil
+        roundToken = nil
+        roundTask?.cancel()
+        roundTask = nil
+        isRoundBusy = false
         activeRoundID = nil
 
         if stage == .proving {
@@ -113,6 +156,55 @@ final class SealFlowModel {
     func waitForCurrentSeal() async {
         let currentTask = sealTask
         await currentTask?.value
+    }
+
+    func beginReveal(roundID: UUID) { beginRoundAction(.reveal, roundID: roundID) }
+    func beginSettle(roundID: UUID, outcome: UInt8) { beginRoundAction(.settle(outcome), roundID: roundID) }
+    func beginDispute(roundID: UUID) { beginRoundAction(.dispute, roundID: roundID) }
+
+    func waitForCurrentRoundAction() async { await roundTask?.value }
+
+    private func beginRoundAction(_ action: LocalRoundAction, roundID: UUID) {
+        guard !isRoundBusy, stage != .proving else { return }
+        guard let sealed = result, sealed.receipt.roundID == roundID else {
+            roundFailure = .unexpected
+            return
+        }
+        let token = UUID()
+        roundToken = token
+        activeRoundID = roundID
+        roundFailure = nil
+        isRoundBusy = true
+        let operation = roundOperation
+        let expectedStage: LocalRoundStage = switch action {
+        case .reveal: .revealed
+        case .settle: .settled
+        case .dispute: .disputed
+        }
+        roundTask = Task { @MainActor [weak self] in
+            do {
+                let updated = try await operation(roundID, action)
+                guard let self, !Task.isCancelled,
+                      self.roundToken == token, self.activeRoundID == roundID else { return }
+                guard updated.stage == expectedStage,
+                      updated.roundID == roundID, updated.round.id == roundID,
+                      updated.round.questionCommitment == sealed.receipt.questionCommitment else {
+                    self.roundFailure = .unexpected
+                    self.isRoundBusy = false
+                    self.roundTask = nil
+                    return
+                }
+                self.roundResult = updated
+                self.isRoundBusy = false
+                self.roundTask = nil
+            } catch {
+                guard let self, !Task.isCancelled,
+                      self.roundToken == token, self.activeRoundID == roundID else { return }
+                self.roundFailure = (error as? AppSealError) ?? .unexpected
+                self.isRoundBusy = false
+                self.roundTask = nil
+            }
+        }
     }
 
     private func finish(

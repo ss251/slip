@@ -28,6 +28,10 @@ struct SlipRootView: View {
             }
             .onPreferenceChange(ChromeHeightKey.self) { chromeHeight = $0 }
             .environment(model).environment(flow)
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { flow.depart(roundID: model.localRound.id) }
+            }
+            .onChange(of: model.localRound.id) { oldID, _ in flow.depart(roundID: oldID) }
             .overlay {
                 // Conceal private UI before the app switcher captures an inactive scene.
                 if scenePhase != .active && !model.isPreview {

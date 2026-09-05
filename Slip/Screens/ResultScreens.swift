@@ -49,6 +49,14 @@ struct SealedRoomScreen: View {
     @Environment(SealFlowModel.self) private var flow
 
     var body: some View {
+        if model.isPreview {
+            previewBody
+        } else {
+            LocalResultScreen(destination: .room)
+        }
+    }
+
+    private var previewBody: some View {
         ScrollView {
             VStack(spacing: SlipSpacing.large) {
                 HStack {
@@ -164,6 +172,14 @@ struct OpeningScreen: View {
     let mode: OpeningMode
 
     var body: some View {
+        if model.isPreview {
+            previewBody
+        } else {
+            LocalResultScreen(destination: mode == .mismatch ? .mismatch : .opening)
+        }
+    }
+
+    private var previewBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SlipSpacing.large) {
                 openingHeader
@@ -338,6 +354,14 @@ struct VerdictScreen: View {
     let satOut: Bool
 
     var body: some View {
+        if model.isPreview {
+            previewBody
+        } else {
+            LocalResultScreen(destination: .verdict)
+        }
+    }
+
+    private var previewBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ResultLayout.compactSectionSpacing) {
                 verdictHeader.padding(.bottom, SlipSpacing.medium)
@@ -477,6 +501,14 @@ struct StandingsScreen: View {
     @State private var period: StandingsPeriod = .week
 
     var body: some View {
+        if model.isPreview {
+            previewBody
+        } else {
+            LocalResultScreen(destination: .standings)
+        }
+    }
+
+    private var previewBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: ResultLayout.compactSectionSpacing) {
                 ScreenHeader(title: "Standings", subtitle: "SATURDAY CREW")
@@ -615,6 +647,14 @@ struct SettleScreen: View {
     @State private var outcome: CallOutcome = .rained
 
     var body: some View {
+        if model.isPreview {
+            previewBody
+        } else {
+            LocalResultScreen(destination: .settle)
+        }
+    }
+
+    private var previewBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SlipSpacing.large) {
                 SheetHeading(title: "Call it")
@@ -669,6 +709,14 @@ struct ChallengeScreen: View {
     @State private var reason = ""
 
     var body: some View {
+        if model.isPreview {
+            previewBody
+        } else {
+            LocalResultScreen(destination: .challenge)
+        }
+    }
+
+    private var previewBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SlipSpacing.large) {
                 SheetHeading(title: "Challenge")
@@ -748,6 +796,14 @@ struct VoidedScreen: View {
     ]
 
     var body: some View {
+        if model.isPreview {
+            previewBody
+        } else {
+            LocalResultScreen(destination: .voided)
+        }
+    }
+
+    private var previewBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SlipSpacing.screen) {
                 ScreenHeader(title: "No result.", subtitle: "SATURDAY CREW · VOIDED")
@@ -801,6 +857,470 @@ struct VoidedScreen: View {
                 .foregroundStyle(SlipColor.secondary)
         }
         .foregroundStyle(SlipColor.ink)
+    }
+}
+
+// MARK: - Proved local results
+
+private enum LocalResultDestination: Equatable {
+    case room, opening, mismatch, verdict, standings, settle, challenge, voided
+}
+
+/// Only the current round's accepted public result drives this presentation. The
+/// opening action takes an identity, never a freshly selected private pick.
+private struct LocalResultScreen: View {
+    @Environment(AppModel.self) private var model
+    @Environment(SealFlowModel.self) private var flow
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let destination: LocalResultDestination
+    @State private var selectedOutcome: UInt8 = 1
+    @State private var pendingStage: LocalRoundStage?
+    @State private var pendingRoundID: UUID?
+
+    private var result: LocalRoundResult? {
+        guard let result = flow.roundResult, result.roundID == model.localRound.id else { return nil }
+        return result
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SlipSpacing.large) {
+                HStack {
+                    ResultIconButton(symbol: "chevron.left", label: "Back", action: model.back)
+                    Spacer()
+                }
+                ScreenHeader(title: title, subtitle: model.localRound.crewName.uppercased())
+                ResultStatusChip(text: "On-device sample · no shared round", symbol: "iphone")
+
+                if let result {
+                    localContent(result)
+                    if let failure = flow.roundFailure, destination != .mismatch {
+                        failureCard(failure)
+                    }
+                    if flow.isRoundBusy {
+                        HStack(spacing: SlipSpacing.medium) {
+                            ProgressView().tint(SlipColor.ink)
+                            Text("Making this step’s proof…")
+                                .font(SlipFont.body)
+                                .foregroundStyle(SlipColor.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    LocalProofTimings(steps: result.steps)
+                } else {
+                    unavailableCard
+                }
+            }
+            .padding(.horizontal, SlipSpacing.screen)
+            .padding(.top, ResultLayout.shellTopPadding)
+            .padding(.bottom, SlipSpacing.section)
+        }
+        .scrollIndicators(.hidden)
+        .background { ArtBackdrop() }
+        .safeAreaInset(edge: .bottom, spacing: SlipSpacing.zero) {
+            BottomActions {
+                actions
+            }
+        }
+        .onChange(of: flow.roundResult) { _, accepted in
+            guard
+                let accepted,
+                let pendingRoundID,
+                pendingRoundID == model.localRound.id,
+                accepted.roundID == pendingRoundID,
+                accepted.stage == pendingStage
+            else { return }
+            pendingStage = nil
+            self.pendingRoundID = nil
+            switch accepted.stage {
+            case .sealed: break
+            case .revealed: model.go(.opening)
+            case .settled: model.go(.verdict)
+            case .disputed: model.go(.voided)
+            }
+        }
+        .onChange(of: flow.roundFailure) { _, failure in
+            guard failure != nil, pendingRoundID == model.localRound.id else { return }
+            pendingStage = nil
+            pendingRoundID = nil
+            if failure == .revealMismatch { model.go(.mismatch) }
+        }
+        .onDisappear {
+            flow.depart(roundID: pendingRoundID ?? model.localRound.id)
+            pendingStage = nil
+            pendingRoundID = nil
+        }
+    }
+
+    private var title: String {
+        switch destination {
+        case .room: model.localRound.question
+        case .opening:
+            if let result, result.revealedChoice != nil { "Your pick opened." } else { "Ready to open?" }
+        case .mismatch:
+            flow.roundFailure == .revealMismatch ? "That reveal didn’t match." : "Opening check"
+        case .verdict:
+            result?.stage == .settled ? "The call is in." : "No result."
+        case .standings: "Local standings"
+        case .settle: "What happened?"
+        case .challenge: "Challenge the call?"
+        case .voided: "No result."
+        }
+    }
+
+    @ViewBuilder private func localContent(_ result: LocalRoundResult) -> some View {
+        if destination != .room {
+            Text(result.round.question)
+                .font(SlipFont.title2)
+                .foregroundStyle(SlipColor.ink)
+        }
+
+        switch destination {
+        case .room:
+            ResultRosterCard(rows: roomRows(result))
+            explanation(
+                title: "Sealed on this device",
+                detail: "This sample has one player. The crew is not connected and no proof has been sent."
+            )
+            if result.stage == .sealed { openingClockDisclosure }
+        case .opening:
+            if result.stage == .sealed {
+                ResultRosterCard(rows: [ResultRosterItem(name: "You", value: "Sealed", sealed: true)])
+                openingClockDisclosure
+            } else {
+                openedRoster(result)
+                ResultVerification(
+                    headline: "Your opened pick matched its seal.",
+                    detail: "The opening proof was generated here. No shared round was updated.",
+                    emphasized: true
+                )
+                if result.stage == .revealed {
+                    explanation(
+                        title: "You call this sample",
+                        detail: "Opening a pick is not an outcome. Nobody scores until the call is proved."
+                    )
+                }
+            }
+        case .mismatch:
+            if flow.roundFailure == .revealMismatch {
+                ResultRosterCard(rows: [ResultRosterItem(name: "You", detail: "Reveal didn’t match the seal", score: "—")])
+                explanation(
+                    title: "The opening was rejected",
+                    detail: "The pick supplied for opening did not match the sealed pick. No opening proof or score was accepted."
+                )
+            } else {
+                explanation(
+                    title: "No rejected reveal in this session",
+                    detail: "This screen only reports a mismatch after the proof preparation rejects an opening."
+                )
+            }
+        case .verdict, .standings:
+            if result.stage == .settled {
+                localVerdictBars(result)
+                scoreCard(result)
+                explanation(
+                    title: destination == .standings ? "One local round" : "Called by you",
+                    detail: "The score comes from your opened pick and the proved outcome. No season history or shared standings are connected."
+                )
+            } else if result.stage == .disputed {
+                voidedContent(result)
+            } else {
+                openedRoster(result)
+                explanation(title: "No score yet", detail: "Open the pick and prove the call to finish this local round.")
+            }
+        case .settle:
+            if result.stage == .revealed {
+                outcomeChoices(result.round)
+                explanation(
+                    title: "Your call, recorded locally",
+                    detail: "This advances the sample clock past its opening window, then proves the selected outcome. It does not change the device clock or submit a transaction."
+                )
+            } else {
+                explanation(title: "The call is not available", detail: "A local pick must be opened before this sample can be called. A completed call cannot be replaced.")
+            }
+        case .challenge:
+            if result.stage == .settled {
+                explanation(
+                    title: "You called it: \(outcomeLabel(result))",
+                    detail: "A proved challenge voids this local round. Nobody scores. This is not a vote and there is no connected crew."
+                )
+                explanation(
+                    title: "Challenged by you",
+                    detail: "Your local player identity will be recorded in the sample’s public result. This uses the sample clock inside the challenge window."
+                )
+            } else {
+                explanation(title: "No call to challenge", detail: "Only a completed, undisputed local call can be challenged here.")
+            }
+        case .voided:
+            if result.stage == .disputed {
+                voidedContent(result)
+            } else {
+                explanation(title: "This round is not voided", detail: "No proved challenge has been accepted for this local round.")
+            }
+        }
+    }
+
+    private func roomRows(_ result: LocalRoundResult) -> [ResultRosterItem] {
+        if result.stage != .sealed {
+            return [ResultRosterItem(name: "You", value: openedLabel(result))]
+        }
+        if let display = flow.sealedDisplay, display.roundID == result.roundID {
+            return [ResultRosterItem(name: "You", value: display.selectedSide, valueDetail: "only you can see this")]
+        }
+        return [ResultRosterItem(name: "You", value: "Sealed", sealed: true)]
+    }
+
+    private func openedRoster(_ result: LocalRoundResult) -> some View {
+        ResultRosterCard(
+            rows: [ResultRosterItem(name: "You", value: openedLabel(result))],
+            revealsOnAppear: result.stage == .revealed && destination == .opening,
+            hapticOnOwnReveal: true
+        )
+    }
+
+    private func openedLabel(_ result: LocalRoundResult) -> String {
+        result.revealedChoice.flatMap { result.round.sideLabel(for: $0) } ?? "Not opened"
+    }
+
+    private func outcomeLabel(_ result: LocalRoundResult) -> String {
+        result.outcome.flatMap { result.round.sideLabel(for: $0) } ?? "No result"
+    }
+
+    private func didWin(_ result: LocalRoundResult) -> Bool {
+        guard result.stage == .settled, let pick = result.revealedChoice, let outcome = result.outcome else { return false }
+        return pick == outcome
+    }
+
+    private func localVerdictBars(_ result: LocalRoundResult) -> some View {
+        SlipCard {
+            VStack(spacing: SlipSpacing.standard) {
+                ForEach([UInt8(1), UInt8(0)], id: \.self) { choice in
+                    let tally = choice == 1 ? result.tallyYes : result.tallyNo
+                    let total = result.tallyYes + result.tallyNo
+                    let won = result.outcome == choice
+                    VStack(spacing: SlipSpacing.small) {
+                        VerdictBarHeading(
+                            side: result.round.sideLabel(for: choice) ?? "Unknown side",
+                            detail: "\(tally) \(tally == 1 ? "pick" : "picks")",
+                            calledIt: won
+                        )
+                        ResultBar(
+                            value: total > 0 ? CGFloat(tally) / CGFloat(total) : .zero,
+                            color: won ? SlipColor.win : SlipColor.secondary
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func scoreCard(_ result: LocalRoundResult) -> some View {
+        ResultRosterCard(
+            rows: [ResultRosterItem(
+                name: "You",
+                detail: didWin(result) ? "You called it" : "Next one’s yours",
+                value: openedLabel(result),
+                score: didWin(result) ? "+1" : "0",
+                winner: didWin(result),
+                struck: !didWin(result)
+            )],
+            showsVerdict: true
+        )
+    }
+
+    @ViewBuilder private func voidedContent(_ result: LocalRoundResult) -> some View {
+        explanation(
+            title: "You challenged the call",
+            detail: "The challenge proof was generated on this device. This local round is voided and its score is zero."
+        )
+        ResultRosterCard(rows: [ResultRosterItem(name: "You", value: openedLabel(result), score: "—")])
+        if result.revealedChoice != nil {
+            ResultVerification(headline: "Your opened pick still matched its seal.", detail: "A challenge changes the result, not the pick.")
+        }
+    }
+
+    @ViewBuilder private func outcomeChoices(_ round: LocalRound) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: SlipSpacing.medium) { localChoiceButtons(round) }
+        } else {
+            HStack(spacing: SlipSpacing.medium) { localChoiceButtons(round) }
+        }
+    }
+
+    private func localChoiceButtons(_ round: LocalRound) -> some View {
+        ForEach([UInt8(1), UInt8(0)], id: \.self) { choice in
+            LocalOutcomeChoiceButton(
+                title: round.sideLabel(for: choice) ?? "Unknown side",
+                isSelected: selectedOutcome == choice
+            ) {
+                selectedOutcome = choice
+            }
+            .disabled(flow.isRoundBusy)
+        }
+    }
+
+    private var openingClockDisclosure: some View {
+        explanation(
+            title: "Open this local sample",
+            detail: "This advances the sample clock to its opening window and proves the original sealed pick. It does not change the device clock or open a shared round."
+        )
+    }
+
+    private var unavailableCard: some View {
+        explanation(
+            title: "No completed local round",
+            detail: "Seal a pick first. This build keeps its local round only for the current app session; it cannot recover a pick after the app is closed."
+        )
+    }
+
+    private func failureCard(_ failure: AppSealError) -> some View {
+        explanation(title: failure.displayName, detail: "This step did not complete. The last accepted local result is unchanged.")
+    }
+
+    private func explanation(title: String, detail: String) -> some View {
+        SlipCard {
+            VStack(alignment: .leading, spacing: SlipSpacing.small) {
+                Text(title).font(SlipFont.headline).foregroundStyle(SlipColor.ink)
+                Text(detail).font(SlipFont.body).foregroundStyle(SlipColor.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder private var actions: some View {
+        if let result {
+            switch destination {
+            case .room, .opening, .mismatch:
+                switch result.stage {
+                case .sealed:
+                    PillButton(title: "Open this local sample") { beginReveal(result) }
+                        .disabled(flow.isRoundBusy)
+                case .revealed:
+                    PillButton(title: "Call this local round") { model.go(.settle) }
+                case .settled:
+                    PillButton(title: "See the verdict") { model.go(.verdict) }
+                case .disputed:
+                    PillButton(title: "See the voided round") { model.go(.voided) }
+                }
+            case .settle:
+                if result.stage == .revealed {
+                    PillButton(title: "Call it: \(result.round.sideLabel(for: selectedOutcome) ?? "selected side")") {
+                        pendingRoundID = result.roundID
+                        pendingStage = .settled
+                        flow.beginSettle(roundID: result.roundID, outcome: selectedOutcome)
+                    }
+                    .disabled(flow.isRoundBusy)
+                } else {
+                    PillButton(title: "Back to the round", tone: .secondary) { model.go(.opening) }
+                }
+            case .challenge:
+                if result.stage == .settled {
+                    PillButton(title: "Challenge and void this local round") {
+                        pendingRoundID = result.roundID
+                        pendingStage = .disputed
+                        flow.beginDispute(roundID: result.roundID)
+                    }
+                    .disabled(flow.isRoundBusy)
+                    PillButton(title: "Keep the call", tone: .secondary, action: model.back)
+                } else {
+                    PillButton(title: "Back to the round", tone: .secondary, action: model.back)
+                }
+            case .verdict:
+                PillButton(title: "See local standings") { model.go(.standings) }
+                if result.stage == .settled {
+                    PillButton(title: "Challenge the call", tone: .secondary) { model.go(.challenge) }
+                }
+            case .standings, .voided:
+                PillButton(title: "New slip") { model.go(.newSlip) }
+            }
+        } else {
+            PillButton(title: "Seal a local pick") { model.go(.seal) }
+        }
+    }
+
+    private func beginReveal(_ result: LocalRoundResult) {
+        pendingRoundID = result.roundID
+        pendingStage = .revealed
+        flow.beginReveal(roundID: result.roundID)
+    }
+}
+
+private struct LocalOutcomeChoiceButton: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipAccessibility) private var accessibility
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: SlipSpacing.medium) {
+                Image(systemName: isSelected ? "checkmark.circle" : "circle").font(SlipFont.title2)
+                Text(title).font(SlipFont.title3Bold).multilineTextAlignment(.center)
+            }
+            .foregroundStyle(isSelected ? SlipColor.background : SlipColor.secondary)
+            .padding(SlipSpacing.standard)
+            .frame(maxWidth: .infinity, minHeight: SlipSpacing.stage)
+            .background(isSelected ? SlipColor.ink : SlipColor.fill, in: RoundedRectangle(cornerRadius: SlipRadius.card))
+            .overlay {
+                if contrast == .increased || accessibility.increaseContrast {
+                    RoundedRectangle(cornerRadius: SlipRadius.card)
+                        .stroke(SlipColor.contrastBorder, lineWidth: SlipStroke.emphasis)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: SlipRadius.card))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private struct LocalProofTimings: View {
+    let steps: [LocalStepReceipt]
+
+    var body: some View {
+        SlipCard {
+            VStack(alignment: .leading, spacing: SlipSpacing.standard) {
+                Text("Proved on this device").font(SlipFont.headline).foregroundStyle(SlipColor.ink)
+                ForEach(steps.indices, id: \.self) { index in
+                    let receipt = steps[index]
+                    VStack(alignment: .leading, spacing: SlipSpacing.small) {
+                        Text(stepTitle(receipt.step))
+                            .font(SlipFont.subheadlineBold)
+                            .foregroundStyle(SlipColor.ink)
+                        Text("Prepare \(milliseconds(receipt.executeDuration)) · Key \(milliseconds(receipt.keyLoadDuration))")
+                            .font(SlipFont.machine)
+                            .foregroundStyle(SlipColor.secondary)
+                        Text("Proof \(milliseconds(receipt.proveDuration)) · \(receipt.proofBytes) bytes")
+                            .font(SlipFont.machine)
+                            .foregroundStyle(SlipColor.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    if index != steps.indices.last { InsetDivider(inset: SlipSpacing.zero) }
+                }
+                Text("Measured locally. These proofs have not been submitted to a network.")
+                    .font(SlipFont.footnote)
+                    .foregroundStyle(SlipColor.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func milliseconds(_ duration: Duration) -> String {
+        let parts = duration.components
+        let value = Double(parts.seconds) * 1_000 + Double(parts.attoseconds) / 1e15
+        return String(format: "%.1f ms", value)
+    }
+
+    private func stepTitle(_ step: LocalProofStep) -> String {
+        switch step {
+        case .enrollMember: "Add the local player"
+        case .createSlip: "Create the round"
+        case .sealPick: "Seal the pick"
+        case .reveal: "Open the pick"
+        case .settle: "Call the outcome"
+        case .dispute: "Challenge the call"
+        }
     }
 }
 

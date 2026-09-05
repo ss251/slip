@@ -29,22 +29,47 @@ targets:
     dependencies:
       - package: MidnightKit
     preBuildScripts:
-      - name: Bundle local seal proving artifacts
+      - name: Bundle local round proving artifacts
         script: |
           set -eu
           DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ProofArtifacts"
           mkdir -p "$DEST/zkir" "$DEST/keys" "$DEST/params"
-          cp "${SRCROOT}/contracts/build/zkir/sealPick.zkir" "$DEST/zkir/"
-          cp "${SRCROOT}/contracts/build/keys/sealPick.prover" "$DEST/keys/"
-          cp "${SRCROOT}/contracts/build/params/bls_midnight_2p14" "$DEST/params/"
+          for circuit in enrollMember createSlip sealPick reveal settle dispute; do
+            cp "${SRCROOT}/contracts/build/zkir/$circuit.zkir" "$DEST/zkir/"
+            cp "${SRCROOT}/contracts/build/keys/$circuit.prover" "$DEST/keys/"
+          done
+          cp "${SRCROOT}/.build/app-proof-params/bls_midnight_2p13" "$DEST/params/"
+          cp "${SRCROOT}/.build/app-proof-params/bls_midnight_2p14" "$DEST/params/"
         inputFiles:
           - $(SRCROOT)/contracts/build/zkir/sealPick.zkir
           - $(SRCROOT)/contracts/build/keys/sealPick.prover
-          - $(SRCROOT)/contracts/build/params/bls_midnight_2p14
+          - $(SRCROOT)/contracts/build/zkir/enrollMember.zkir
+          - $(SRCROOT)/contracts/build/zkir/createSlip.zkir
+          - $(SRCROOT)/contracts/build/zkir/reveal.zkir
+          - $(SRCROOT)/contracts/build/zkir/settle.zkir
+          - $(SRCROOT)/contracts/build/zkir/dispute.zkir
+          - $(SRCROOT)/contracts/build/keys/enrollMember.prover
+          - $(SRCROOT)/contracts/build/keys/createSlip.prover
+          - $(SRCROOT)/contracts/build/keys/reveal.prover
+          - $(SRCROOT)/contracts/build/keys/settle.prover
+          - $(SRCROOT)/contracts/build/keys/dispute.prover
+          - $(SRCROOT)/.build/app-proof-params/bls_midnight_2p13
+          - $(SRCROOT)/.build/app-proof-params/bls_midnight_2p14
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/sealPick.zkir
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/sealPick.prover
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/params/bls_midnight_2p14
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/params/bls_midnight_2p13
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/enrollMember.zkir
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/createSlip.zkir
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/reveal.zkir
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/settle.zkir
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/zkir/dispute.zkir
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/enrollMember.prover
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/createSlip.prover
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/reveal.prover
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/settle.prover
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ProofArtifacts/keys/dispute.prover
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sailesh.slip

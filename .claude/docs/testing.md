@@ -19,7 +19,11 @@ Evidence over assertion. Every feature lands with its tests; every summary quote
 ## App-only simulator verification
 
 The local app has no network or persistence path. Proof tests exercise both legal
-picks against the bundled runtime and prover; snapshot data is explicitly synthetic.
+picks and all six lifecycle circuits against the bundled runtime and prover. The
+mismatch test flips only the reveal witness, expects circuit rejection, then checks
+that replaying the accepted prefix allows the original opening. Local sample time
+is explicit and is not evidence of network acceptance. See `docs/phase4-sources.md`.
+Snapshot data is explicitly synthetic.
 Never capture a real user's private pick or pass witness data through launch flags.
 
 Build/install the app on the simulator, then use the checked-in capture script:
@@ -42,14 +46,37 @@ record the key-window references, then run again without recording:
 
 ```sh
 TEST_RUNNER_SLIP_RECORD_SNAPSHOTS=1 xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
+swift scripts/optimize-snapshots.swift
 xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-The 120 references cover light, dark, XL, AX1 and AX5. Suites are serialized and
+The 120 references cover light, dark, XL, AX1 and AX5 at 1× standard range (8-bit),
+with point/pixel dimensions asserted. The comparison threshold remains 0.012.
+The compression script preserves decoded pixels, removes invalidated Apple iDOT
+offset metadata, and enforces a total below 15 MB. Suites are serialized and
 render through `drawHierarchyInKeyWindow`; only the explicit environment variable
 opts into recording. Keep simulator capture and test runs sequential, not concurrent.
 Runtime-specific coverage must be reported honestly: an iOS 27 test pass does not
 establish iOS 17 deployment or iOS 26 Liquid Glass compatibility.
+
+For the real-result view layouts, DEBUG-only fixtures seed synthetic public results
+without executing or proving anything. Every capture displays a fixture banner.
+Terminate between launches, choose light/dark and optionally add `--accessibility-max
+--reduce-motion --reduce-transparency --contrast`:
+
+```sh
+xcrun simctl launch booted com.sailesh.slip --slip-local-fixture settled-won --screen 07-standings --appearance light
+xcrun simctl io booted screenshot /tmp/slip-local-standings-light.png
+```
+
+Fixture values: `sealed`, `revealed`, `settled-won`, `settled-lost`, `disputed`,
+`mismatch`, `parametersMissing`. No secret, salt or private choice is accepted from
+launch arguments. `--preview` takes precedence and selects canonical board data.
+Fixture screenshots establish layout only; the native circuit tests establish the
+local behavior. Manual scroll/gesture checks remain a separate owner check.
+Use `sh scripts/capture-local-results.sh /tmp/slip-results` for the 24 normal-size
+light/dark captures, or prefix with `SLIP_CAPTURE_VARIANT=accessibility-max` for
+the same routes with AX5 and all reduced-effects paths.
 
 ## Dependency pinning
 
