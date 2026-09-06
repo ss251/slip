@@ -34,7 +34,7 @@ For every UI change, also run:
 scripts/design-gate.sh Slip/
 ```
 
-Use the shared design tokens, preserve 44×44pt hit targets and Dynamic Type, and inspect the changed screens on the simulator in light and dark. Check affected Reduce Motion and Reduce Transparency behavior. Screenshots establish layout; they do not establish gesture timing, haptic delivery, proof correctness or network acceptance. Record the device/runtime actually tested rather than inferring compatibility from the deployment target.
+Use the shared design tokens, preserve 44×44pt hit targets and Dynamic Type, and inspect the changed screens on the simulator in light and dark. Check affected Reduce Motion and Reduce Transparency behavior. Screenshots establish layout; they do not establish gesture timing, haptic delivery, proof correctness or network acceptance. Record the device/runtime actually tested rather than inferring compatibility from the deployment target. **Full-app runtime verification is currently on iOS 27 only.** The iOS 17 deployment target is unverified as a supported minimum, and physical iOS 26.6.1 proving-component results do not establish full UI compatibility. The pre-iOS 26 material fallback and signing/archive path still need separate verification. See [runtime compatibility](docs/runtime-compatibility.md).
 
 Run the toolchain freshness gate:
 

@@ -36,7 +36,7 @@ The actor retains the original device secret and pick only in memory. The circui
 
 Physical-device run (2026-09-05, iPhone 15 Pro / A17 Pro, iOS 26.6.1, this app build): the sealing and round-flow suites pass on the phone (13 tests, 2 suites) and the complete local lifecycle proves all six circuits with real, round-bound proofs (3 tests). Earlier standalone benchmark (2026-09-03, same phone): `sealPick` key load **24 ms**, prove **1,776 ms**, **4,480 bytes**, peak RSS **290 MB** — see [MidnightKit measurements](.claude/docs/midnightkit.md).
 
-Current app gate (2026-09-06, iPhone 17 Pro simulator / iOS 27): **73 tests passed**, including six real-circuit proving cases, the complete lifecycle, circuit-level mismatch rejection followed by recovery, and the network-component boundary. One complete-round run on 2026-09-05 measured:
+App runtime audit (2026-09-06, iPhone 15 Pro simulator / iOS 27.0, c4a043e): **96 tests in 19 suites passed after 130.395 seconds**, including six real-circuit proving cases, the complete lifecycle, circuit-level mismatch rejection followed by recovery, and the network-component boundary. One complete-round run on 2026-09-05 measured:
 
 | Circuit | Prepare / replay | Key load | Prove | Proof bytes |
 |---|---:|---:|---:|---:|
@@ -66,7 +66,7 @@ Both tables are single-run observations (host CPU, then the phone), not latency 
 
 ## Build and test
 
-Swift 6/SwiftUI, an iOS 17 deployment target, and Liquid Glass where available. Current verification uses Xcode 27 beta with the iPhone 17 Pro iOS 27 simulator, plus a physical iPhone 15 Pro on iOS 26.6.1 for the proving suites (above). iOS 17 runtime behavior and archive compatibility are still unverified; the deployment setting alone is not compatibility evidence.
+Swift 6/SwiftUI, an iOS 17 deployment target, and Liquid Glass where available. **Full-app runtime verification is on iOS 27 only**, using Xcode 27 beta and iPhone 15 Pro / iPhone 17 Pro simulators. The physical iPhone 15 Pro / iOS 26.6.1 results above cover proving components and the local lifecycle, not a full UI compatibility audit. iOS 17 behavior, the pre-iOS 26 material fallback, and archive compatibility remain unverified; the deployment setting is not a verified minimum. See [runtime compatibility](docs/runtime-compatibility.md).
 
 Prerequisites: Xcode, XcodeGen 2.45+, Compact compiler **0.31.1** (language **0.23.0**, runtime **0.16.0**, ledger **8**), Node/npm, generated contract artifacts, and the matching simulator native archive. No network services are needed to run the local app.
 
