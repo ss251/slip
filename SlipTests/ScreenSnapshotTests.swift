@@ -147,7 +147,18 @@ struct ScreenSnapshotTests {
         host.view.frame = window.bounds
         host.view.setNeedsLayout()
         host.view.layoutIfNeeded()
+        // The reviewed canvases were captured on a 402×874 iPhone 17 Pro scene.
+        // Pin their content insets too: a fixed image size alone still inherits
+        // the destination device's notch and home-indicator geometry.
+        let canvasInsets = UIEdgeInsets(top: 62, left: 0, bottom: size.height == 852 ? 12 : 34, right: 0)
+        let nativeInsets = host.view.safeAreaInsets
+        host.additionalSafeAreaInsets = UIEdgeInsets(
+            top: canvasInsets.top - nativeInsets.top, left: 0,
+            bottom: canvasInsets.bottom - nativeInsets.bottom, right: 0)
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
         try await Task.sleep(for: .milliseconds(150))
+        #expect(host.view.safeAreaInsets == canvasInsets, "Snapshot content insets must be independent of the simulator model")
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.preferredRange = .standard
