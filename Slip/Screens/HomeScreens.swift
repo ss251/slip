@@ -76,17 +76,17 @@ struct HomeScreen: View {
                     model.go(.room)
                 }
             }
-        }
-
-        VStack(alignment: .leading, spacing: SlipSpacing.standard) {
-            HomeDayHeading(day: "Tuesday", state: "Settled")
-            HomeCompactSlipRow(
-                question: "Will Raj actually ship this week?",
-                crew: "Saturday crew",
-                detail: "He didn’t · 4 of 5 called it",
-                state: .score("+1")
-            ) {
-                model.go(.verdict)
+        } else {
+            VStack(alignment: .leading, spacing: SlipSpacing.standard) {
+                HomeDayHeading(day: "Tuesday", state: "Settled")
+                HomeCompactSlipRow(
+                    question: "Will Raj actually ship this week?",
+                    crew: "Saturday crew",
+                    detail: "He didn’t · 4 of 5 called it",
+                    state: .score("+1")
+                ) {
+                    model.go(.verdict)
+                }
             }
         }
     }
