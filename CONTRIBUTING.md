@@ -36,7 +36,7 @@ For every UI change, also run:
 scripts/design-gate.sh Slip/
 ```
 
-Use the shared design tokens, preserve 44×44pt hit targets and Dynamic Type, and inspect the changed screens on the simulator in light and dark. Check affected Reduce Motion and Reduce Transparency behavior. Screenshots establish layout; they do not establish gesture timing, haptic delivery, proof correctness or network acceptance. Record the device/runtime actually tested rather than inferring compatibility from the deployment target. **Full-app runtime verification is currently on iOS 27 only.** The iOS 17 deployment target is unverified as a supported minimum, and physical iOS 26.6.1 proving-component results do not establish full UI compatibility. The pre-iOS 26 material fallback and signing/archive path still need separate verification. See [runtime compatibility](docs/runtime-compatibility.md).
+Use the shared design tokens, preserve 44×44pt hit targets and Dynamic Type, and inspect the changed screens on the simulator in light and dark. Check affected Reduce Motion and Reduce Transparency behavior. Screenshots establish layout; they do not establish gesture timing, haptic delivery, proof correctness or network acceptance. Record the device/runtime actually tested rather than inferring compatibility from the deployment target. **Canonical pixel comparison and recording run only on the recorded iOS 27.0.0 runtime, matching major, minor and patch versions.** On other runtimes, `ScreenSnapshotTests.allScreens` reports an explicit skip naming both the reference and running runtimes. The other rendering checks and every non-snapshot test still run and must pass. Verified Debug results are 97 passed with all 120 comparisons on iOS 27.0.0, and 96 passed with one explicit comparison skip on iOS 18.6. iOS 18.6 render verification includes reviewed light/dark captures and a real 180.05-second local rehearsal. The iOS 17 deployment target remains unverified as a supported minimum, and physical iOS 26.6.1 proving-component results do not establish full UI compatibility. Signing/archive verification remains separate. See [runtime compatibility](docs/runtime-compatibility.md).
 
 Run the toolchain freshness gate:
 
@@ -48,15 +48,15 @@ sh scripts/freshness-gate.sh
 
 ## Snapshot updates
 
-Review the rendered change against the [canonical design boards](docs/design/v6/) before recording. Re-record only the affected routes with an explicit allowlist. For example, for an approved change to the home route:
+Review the rendered change against the [canonical design boards](docs/design/v6/) before recording. The reviewed PNGs and `0.012` comparison threshold remain unchanged for runtime-only differences. Re-record only when an authorized change alters the default app's rendered pixels on the canonical iOS 27.0.0 runtime, and only for affected routes with an explicit allowlist. Do not create separate references for other OS versions. For example, for an approved change to the home route:
 
 ```sh
 TEST_RUNNER_SLIP_RECORD_SNAPSHOTS=1 \
 TEST_RUNNER_SLIP_SNAPSHOT_SCREENS=01-home \
-xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
+xcodebuild -scheme Slip -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0' test
 ```
 
-The allowlist accepts comma-separated route identifiers. Recording without a nonempty valid allowlist is rejected by [ScreenSnapshotTests](SlipTests/ScreenSnapshotTests.swift). Run the suite again without recording to verify the references. Keep PNGs compact with lossless compression and verify decoded pixel identity; avoid unrelated snapshot churn. Refresh only the corresponding canonical v6 boards, using the filename mapping in the design reference. Use synthetic fixtures, never real private picks, and serialize simulator capture and test runs.
+The allowlist accepts comma-separated route identifiers. Recording without a nonempty valid allowlist is rejected by [ScreenSnapshotTests](SlipTests/ScreenSnapshotTests.swift). Run the suite again on iOS 27.0.0 without recording to verify the references. On another runtime, retain the explicit comparison skip in the test evidence and review native captures plus the local rehearsal; a skipped comparison is not a pixel-match pass. Keep PNGs compact with lossless compression and verify decoded pixel identity; avoid unrelated snapshot churn. Refresh only the corresponding canonical v6 boards, using the filename mapping in the design reference. Use synthetic fixtures, never real private picks, and serialize simulator capture and test runs.
 
 ## Compact and dependency changes
 
