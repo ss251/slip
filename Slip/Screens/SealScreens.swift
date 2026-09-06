@@ -97,14 +97,19 @@ struct SealScreen: View {
                 .font(SlipFont.large).foregroundStyle(SlipColor.ink.opacity(proving ? SlipOpacity.muted : SlipOpacity.opaque))
                 .accessibilityLabel(already && !peek.isVisible ? "Your pick is concealed" : "Your pick: \(displayedChoice)")
             if !already { Text("Only you can see this").font(SlipFont.footnote).foregroundStyle(SlipColor.secondary) }
-            TimelineView(.animation(paused: hold.began == nil)) { context in
-                Circle().stroke(SlipColor.separator, lineWidth: SlipStroke.emphasis)
-                    .overlay {
-                        Circle().trim(from: SlipSpacing.zero, to: already || proving ? SlipOpacity.opaque : hold.progress(at: context.date.timeIntervalSinceReferenceDate))
-                            .fill(SlipColor.seal)
+            Group {
+                if already {
+                    SealMark(size: SlipSize.sealDisc)
+                } else {
+                    TimelineView(.animation(paused: hold.began == nil)) { context in
+                        Circle().stroke(SlipColor.separator, lineWidth: SlipStroke.emphasis)
+                            .overlay {
+                                Circle().trim(from: SlipSpacing.zero, to: proving ? SlipOpacity.opaque : hold.progress(at: context.date.timeIntervalSinceReferenceDate))
+                                    .fill(SlipColor.seal)
+                            }
+                            .frame(width: SlipSize.largeIcon, height: SlipSize.largeIcon)
                     }
-                    .frame(width: already ? SlipSize.sealDisc : SlipSize.largeIcon,
-                           height: already ? SlipSize.sealDisc : SlipSize.largeIcon)
+                }
             }.padding(.top, SlipSpacing.medium)
             if already { Text("Hold to peek").font(SlipFont.footnoteBold).foregroundStyle(SlipColor.secondary) }
         }
