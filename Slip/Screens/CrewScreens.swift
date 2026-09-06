@@ -418,7 +418,12 @@ struct YouScreen: View {
                 }
                 InsetDivider(inset: SlipSpacing.standard)
                 ProfileSettingRow(title: "Steward relay", symbol: "antenna.radiowaves.left.and.right", detail: networkTracker?.relayHost ?? "Not connected") {
-                    model.inform(networkTracker?.relayHost == nil ? "Launch with --relay and --contract, or ask your steward for a setup link." : "Sealed picks are handed to this steward, who pays the fee and posts them.")
+                    #if DEBUG
+                    let disconnectedMessage = "Launch with --relay and --contract."
+                    #else
+                    let disconnectedMessage = "No steward connection is configured. You can still prove a local round on this iPhone."
+                    #endif
+                    model.inform(networkTracker?.relayHost == nil ? disconnectedMessage : "Sealed picks are handed to this steward, who pays the fee and posts them.")
                 }
                 InsetDivider(inset: SlipSpacing.standard)
                 ProfileSettingRow(title: "Your member id", symbol: "person.crop.square", detail: networkTracker?.memberIDHex.map { "\($0.prefix(6))…\($0.suffix(4))" } ?? "Made when you connect", machine: networkTracker?.memberIDHex != nil) {

@@ -29,6 +29,7 @@ struct NetworkSetup: Equatable, Sendable {
         defaults.removeObject(forKey: relayKey); defaults.removeObject(forKey: contractKey); defaults.removeObject(forKey: tokenKey)
     }
 
+    #if DEBUG
     /// `--relay <url> --contract <64-hex>` (DEBUG launches, simctl).
     static func fromLaunchArguments(_ arguments: [String]) -> NetworkSetup? {
         func value(_ flag: String) -> String? {
@@ -38,6 +39,7 @@ struct NetworkSetup: Equatable, Sendable {
         guard let url = value("--relay").flatMap(URL.init(string:)), let address = value("--contract"), isAddress(address) else { return nil }
         return NetworkSetup(relayURL: url, contractAddressHex: address, relayToken: value("--relay-token"))
     }
+    #endif
 
     static func isAddress(_ hex: String) -> Bool { hex.count == 64 && Data(hex: hex) != nil }
 }
