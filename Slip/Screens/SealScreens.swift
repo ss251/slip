@@ -51,7 +51,7 @@ struct SealScreen: View {
                         }.padding(.top, SlipSpacing.medium)
                     } else {
                         choices.padding(.horizontal, typeSize.isAccessibilitySize ? SlipSpacing.zero : SlipSpacing.medium)
-                        Text("Nobody — not even Slip — can read a sealed pick.")
+                        Text("Your sealed pick stays on this iPhone. You can still peek at it.")
                             .font(SlipFont.footnote).foregroundStyle(SlipColor.onTicket).multilineTextAlignment(.center)
                     }
                 }.padding(.horizontal, SlipSpacing.large)

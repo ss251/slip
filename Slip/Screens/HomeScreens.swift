@@ -372,7 +372,7 @@ struct HowItWorksScreen: View {
                         .accessibilityAddTraits(.isHeader)
                         .font(SlipFont.large)
                         .foregroundStyle(SlipColor.ink)
-                    Text("One question, a few friends, zero peeking.")
+                    Text("One question, a few friends, sealed picks.")
                         .font(SlipFont.body)
                         .foregroundStyle(SlipColor.secondary)
                 }

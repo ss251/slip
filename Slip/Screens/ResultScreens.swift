@@ -342,7 +342,7 @@ struct OpeningScreen: View {
             VStack(alignment: .leading, spacing: SlipSpacing.small) {
                 Text("About Raj’s pick").font(SlipFont.headline)
                     .accessibilityAddTraits(.isHeader)
-                Text("A pick only counts if what’s opened is exactly what was sealed. Raj’s wasn’t, so his pick sits this round out. Nobody else is affected, and nothing about anyone’s pick was ever visible early.")
+                Text("A pick only counts if what’s opened is exactly what was sealed. Raj’s wasn’t, so his pick sits this round out. Nobody else is affected.")
                     .font(SlipFont.body)
                     .foregroundStyle(SlipColor.secondary)
             }
