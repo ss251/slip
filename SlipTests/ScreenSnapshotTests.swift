@@ -10,9 +10,11 @@ struct ScreenSnapshotTests {
     private static let directory = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().appendingPathComponent("Snapshots")
 
-    @Test("Every screen matches its reviewed light, dark, XL and accessibility snapshots")
+    @Test("Every screen matches its reviewed light, dark, XL and accessibility snapshots",
+          SnapshotReferenceRuntime.condition)
     func allScreens() async throws {
         let record = ProcessInfo.processInfo.environment["SLIP_RECORD_SNAPSHOTS"] == "1"
+        var compared = 0
         let selected = Set((ProcessInfo.processInfo.environment["SLIP_SNAPSHOT_SCREENS"] ?? "")
             .split(separator: ",").map(String.init))
         if record {
@@ -32,7 +34,32 @@ struct ScreenSnapshotTests {
                     let reference = try #require(UIImage(contentsOfFile: url.path), "Missing reviewed snapshot: \(name)")
                     let difference = try normalizedDifference(image, reference)
                     #expect(difference < 0.012, "Snapshot changed: \(name), mean pixel difference \(difference)")
+                    compared += 1
                 }
+            }
+        }
+        if !record {
+            print("SNAPSHOT_REFERENCE_COMPARISONS: \(compared) compared against iOS 27.0.0 references; threshold 0.012.")
+        }
+    }
+
+    @Test("Pixel comparisons skip exactly when the runtime differs from the recorded version")
+    func referenceRuntimeScope() throws {
+        let cases: [(OperatingSystemVersion, String?)] = [
+            (.init(majorVersion: 27, minorVersion: 0, patchVersion: 0), nil),
+            (.init(majorVersion: 18, minorVersion: 6, patchVersion: 0), "iOS 18.6.0"),
+            (.init(majorVersion: 26, minorVersion: 0, patchVersion: 0), "iOS 26.0.0"),
+            (.init(majorVersion: 28, minorVersion: 0, patchVersion: 0), "iOS 28.0.0"),
+            (.init(majorVersion: 27, minorVersion: 1, patchVersion: 0), "iOS 27.1.0"),
+            (.init(majorVersion: 27, minorVersion: 0, patchVersion: 1), "iOS 27.0.1")
+        ]
+        for (runtime, skippedRuntime) in cases {
+            let reason = SnapshotReferenceRuntime.skipReason(running: runtime)
+            if let skippedRuntime {
+                let message = try #require(reason)
+                #expect(message == "Snapshot pixel comparisons skipped by runtime: references recorded on iOS 27.0.0; running \(skippedRuntime).")
+            } else {
+                #expect(reason == nil)
             }
         }
     }
@@ -195,6 +222,22 @@ struct ScreenSnapshotTests {
             context.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
         }
         return bytes
+    }
+}
+
+/// Golden pixels belong to the recorded OS version, not its system-metric successors.
+/// Other runtimes retain all non-comparison tests and are reviewed through live captures.
+private enum SnapshotReferenceRuntime {
+    static func skipReason(running version: OperatingSystemVersion) -> String? {
+        guard version.majorVersion != 27 || version.minorVersion != 0 || version.patchVersion != 0 else {
+            return nil
+        }
+        return "Snapshot pixel comparisons skipped by runtime: references recorded on iOS 27.0.0; running iOS \(version.majorVersion).\(version.minorVersion).\(version.patchVersion)."
+    }
+
+    static var condition: ConditionTrait {
+        let reason = skipReason(running: ProcessInfo.processInfo.operatingSystemVersion)
+        return .disabled(if: reason != nil, reason.map { Comment(rawValue: $0) })
     }
 }
 
