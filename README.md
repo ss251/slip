@@ -66,7 +66,9 @@ Both tables are single-run observations (host CPU, then the phone), not latency 
 
 ## Build and test
 
-Swift 6/SwiftUI, an iOS 17 deployment target, and Liquid Glass where available. **The Debug suite passed on iOS 27.0 and iOS 18.6.** Canonical pixel references are recorded on iOS 27.0.0: 97 tests passed with all 120 comparisons. Other runtimes explicitly skip that comparison with a reason naming both runtimes; all remaining tests must pass. The iOS 18.6 result was 96 passed, one explicit comparison skip, zero failures. iOS 18.6 render verification includes reviewed light/dark captures of the pre-iOS 26 material tab bar and a real **180.05-second** local rehearsal. The physical iPhone 15 Pro / iOS 26.6.1 results above cover proving components and the local lifecycle, not a full UI compatibility audit. iOS 17 behavior and signed archive compatibility remain unverified; the deployment setting is not a verified minimum. See [runtime compatibility](docs/runtime-compatibility.md) for the runtime contract and exact Debug test results.
+Swift 6/SwiftUI, a **17.0 deployment minimum with simulator validation on iOS 17.5**, and Liquid Glass where available. **The Debug suite passed on iOS 27.0, 18.6 and 17.5.** Canonical pixel references belong to iOS 27.0.0: 97 tests passed with all 120 comparisons. iOS 18.6 and 17.5 each passed 96 tests with one explicit comparison skip naming the reference and running runtimes, and zero failures.
+
+Both older runtimes have reviewed light/dark captures of the pre-iOS 26 material tab bar. The iOS 18.6 local rehearsal took 180.05 seconds. The iOS 17.5 local lifecycle reached standings in 180.07 seconds through accessibility presses and the unchanged timed seal action; its seal proof took **1.000 s**. Coordinate HID and scroll reachability were not verified by that harness. The physical iOS 26.6.1 results above cover proving components and the local lifecycle, not a full UI or signed archive audit. See [runtime compatibility](docs/runtime-compatibility.md) for the exact evidence and limits, and [contribution guidance](CONTRIBUTING.md#verify-the-change) for shared-machine build limits.
 
 Prerequisites: Xcode, XcodeGen 2.45+, Compact compiler **0.31.1** (language **0.23.0**, runtime **0.16.0**, ledger **8**), Node/npm, generated contract artifacts, and the matching simulator native archive. No network services are needed to run the local app.
 
@@ -89,10 +91,10 @@ cd ..
 # Existing official public parameter files, not a server or witness export:
 sh scripts/prepare-app-params.sh /path/to/existing/params
 xcodegen generate
-xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
+xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -jobs 4 -parallel-testing-enabled NO test
 scripts/design-gate.sh Slip/
 cd MidnightKit
-xcodebuild test -scheme MidnightKit -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+xcodebuild test -scheme MidnightKit -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -jobs 4 -parallel-testing-enabled NO
 ```
 
 Parameter staging checks the official k13/k14 SHA-256 values and has no download fallback. Open the generated `Slip.xcodeproj`, choose Slip and a simulator, then Run. Repository signing uses personal team `L594CGSH6A`; contributors must use their own authorized signing configuration for any later device work.

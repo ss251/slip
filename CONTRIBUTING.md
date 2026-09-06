@@ -22,10 +22,11 @@ The installed pre-push hook runs toolchain freshness, design/privacy checks and 
 
 ## Verify the change
 
-For app changes, run the app suite and include its actual passed-count line in the review evidence:
+For app changes, run the app suite and include its actual passed-count line in the review evidence. On the shared development Mac, check `uptime` before building; while the 1-minute load exceeds 40, wait 60 seconds and check again. Use one incremental `xcodebuild` at a time, with four jobs and serial tests. After generating the project, set `BuildAction`'s `parallelizeBuildables = "NO"` in the generated Slip scheme to keep targets serial. `-parallelizeTargets` is an enabling switch, not a Boolean option: adding `NO` fails with `Unknown build action 'NO'` before compilation. Use an explicit temporary derived-data path, retain the result evidence, then remove that path after the run. Never boot more than one extra simulator beside the shared device; shut down and delete disposable devices after use.
 
 ```sh
-xcodebuild -scheme Slip -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
+xcodebuild -scheme Slip -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -derivedDataPath /tmp/slip-app-check -jobs 4 -parallel-testing-enabled NO test
 ```
 
 **Debug is the tested configuration.** The unsigned arm64 simulator Release app builds, but the current app suite uses `@testable import Slip`: running it with `-configuration Release` fails before test execution because that module is built without `-enable-testing` (`ENABLE_TESTABILITY=NO`). Do not count that attempt as a pass or enable testability in the shipping configuration to hide the distinction. The local native prover archive supports arm64 simulators only. See the [Release build audit](docs/release-audit.md) for the build, bundle and DEBUG-surface evidence.
@@ -36,7 +37,7 @@ For every UI change, also run:
 scripts/design-gate.sh Slip/
 ```
 
-Use the shared design tokens, preserve 44×44pt hit targets and Dynamic Type, and inspect the changed screens on the simulator in light and dark. Check affected Reduce Motion and Reduce Transparency behavior. Screenshots establish layout; they do not establish gesture timing, haptic delivery, proof correctness or network acceptance. Record the device/runtime actually tested rather than inferring compatibility from the deployment target. **Canonical pixel comparison and recording run only on the recorded iOS 27.0.0 runtime, matching major, minor and patch versions.** On other runtimes, `ScreenSnapshotTests.allScreens` reports an explicit skip naming both the reference and running runtimes. The other rendering checks and every non-snapshot test still run and must pass. Verified Debug results are 97 passed with all 120 comparisons on iOS 27.0.0, and 96 passed with one explicit comparison skip on iOS 18.6. iOS 18.6 render verification includes reviewed light/dark captures and a real 180.05-second local rehearsal. The iOS 17 deployment target remains unverified as a supported minimum, and physical iOS 26.6.1 proving-component results do not establish full UI compatibility. Signing/archive verification remains separate. See [runtime compatibility](docs/runtime-compatibility.md).
+Use the shared design tokens, preserve 44×44pt hit targets and Dynamic Type, and inspect the changed screens on the simulator in light and dark. Check affected Reduce Motion and Reduce Transparency behavior. Screenshots establish layout; they do not establish gesture timing, haptic delivery, proof correctness or network acceptance. Record the device/runtime actually tested rather than inferring compatibility from the deployment target. **Canonical pixel comparison and recording run only on the recorded iOS 27.0.0 runtime, matching major, minor and patch versions.** On other runtimes, `ScreenSnapshotTests.allScreens` reports an explicit skip naming both the reference and running runtimes. The other rendering checks and every non-snapshot test still run and must pass. Verified Debug results are 97 passed with all 120 comparisons on iOS 27.0.0, and 96 passed with one explicit comparison skip on each of iOS 18.6 and iOS 17.5. iOS 18.6 render verification includes reviewed light/dark captures and a real 180.05-second local rehearsal. The configured 17.0 minimum now has simulator validation on iOS 17.5: the local lifecycle completed in 180.07 seconds through accessibility presses and the existing 1.2-second timed seal action. Coordinate HID did not respond in that host/runtime harness, and AX scroll commands did not move the viewport, so a complete gesture/scroll rehearsal is not claimed. Physical iOS 26.6.1 proving-component results do not establish full UI compatibility. Signing/archive verification remains separate. See [runtime compatibility](docs/runtime-compatibility.md).
 
 Run the toolchain freshness gate:
 
@@ -53,7 +54,8 @@ Review the rendered change against the [canonical design boards](docs/design/v6/
 ```sh
 TEST_RUNNER_SLIP_RECORD_SNAPSHOTS=1 \
 TEST_RUNNER_SLIP_SNAPSHOT_SCREENS=01-home \
-xcodebuild -scheme Slip -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0' test
+xcodebuild -scheme Slip -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=27.0' \
+  -derivedDataPath /tmp/slip-app-check -jobs 4 -parallel-testing-enabled NO test
 ```
 
 The allowlist accepts comma-separated route identifiers. Recording without a nonempty valid allowlist is rejected by [ScreenSnapshotTests](SlipTests/ScreenSnapshotTests.swift). Run the suite again on iOS 27.0.0 without recording to verify the references. On another runtime, retain the explicit comparison skip in the test evidence and review native captures plus the local rehearsal; a skipped comparison is not a pixel-match pass. Keep PNGs compact with lossless compression and verify decoded pixel identity; avoid unrelated snapshot churn. Refresh only the corresponding canonical v6 boards, using the filename mapping in the design reference. Use synthetic fixtures, never real private picks, and serialize simulator capture and test runs.
