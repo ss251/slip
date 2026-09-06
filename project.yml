@@ -26,6 +26,10 @@ targets:
     platform: iOS
     sources:
       - path: Slip
+        excludes:
+          - Resources/PrivacyInfo.xcprivacy
+      - path: Slip/Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources
     dependencies:
       - package: MidnightKit
     preBuildScripts:
