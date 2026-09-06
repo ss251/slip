@@ -15,11 +15,11 @@ struct ResultAccessibilityTests {
                 == "Tomás. Sat this one out. No opened pick. No score")
     }
 
-    @Test("Each verdict side has one complete spoken summary, including sat-out counts")
+    @Test("Each verdict side summarizes only actual picks")
     func verdictLabels() {
         #expect(ResultAccessibility.verdict(side: "Yes", picks: 3, calledIt: true) == "Yes. 3 picks. called it")
         #expect(ResultAccessibility.verdict(side: "No", picks: 2) == "No. 2 picks")
-        #expect(ResultAccessibility.verdict(side: "No", picks: 1, satOut: 1) == "No. 1 pick. 1 sat out")
+        #expect(ResultAccessibility.verdict(side: "No", picks: 1) == "No. 1 pick")
     }
 
     @Test("Accessible preview actions name and navigate to the existing context-menu destinations")

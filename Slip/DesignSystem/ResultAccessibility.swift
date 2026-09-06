@@ -25,10 +25,9 @@ enum ResultAccessibility {
         return parts.joined(separator: ". ")
     }
 
-    static func verdict(side: String, picks: Int, calledIt: Bool = false, satOut: Int = 0) -> String {
+    static func verdict(side: String, picks: Int, calledIt: Bool = false) -> String {
         var parts = [side, "\(picks) \(picks == 1 ? "pick" : "picks")"]
         if calledIt { parts.append("called it") }
-        if satOut > 0 { parts.append("\(satOut) sat out") }
         return parts.joined(separator: ". ")
     }
 }

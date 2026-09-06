@@ -1681,12 +1681,19 @@ private struct VerdictBars: View {
                 .accessibilityLabel(ResultAccessibility.verdict(side: "Yes", picks: 3, calledIt: true))
 
                 VStack(spacing: SlipSpacing.small) {
-                    VerdictBarHeading(side: "No", detail: satOut ? "1 pick · 1 sat out" : "2 picks")
+                    VerdictBarHeading(side: "No", detail: satOut ? "1 pick" : "2 picks")
                     ResultBar(value: satOut ? ResultLayout.satOutNoShare : ResultLayout.normalNoShare, color: SlipColor.secondary)
                         .accessibilityHidden(true)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel(ResultAccessibility.verdict(side: "No", picks: satOut ? 1 : 2, satOut: satOut ? 1 : 0))
+                .accessibilityLabel(ResultAccessibility.verdict(side: "No", picks: satOut ? 1 : 2))
+
+                if satOut {
+                    Text("1 sat out")
+                        .font(SlipFont.footnote)
+                        .foregroundStyle(SlipColor.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(.vertical, SlipSpacing.small)
             .foregroundStyle(SlipColor.ink)
