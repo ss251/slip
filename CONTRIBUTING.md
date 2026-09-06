@@ -25,8 +25,10 @@ The installed pre-push hook runs toolchain freshness, design/privacy checks and 
 For app changes, run the app suite and include its actual passed-count line in the review evidence:
 
 ```sh
-xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
+xcodebuild -scheme Slip -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
+
+**Debug is the tested configuration.** The unsigned arm64 simulator Release app builds, but the current app suite uses `@testable import Slip`: running it with `-configuration Release` fails before test execution because that module is built without `-enable-testing` (`ENABLE_TESTABILITY=NO`). Do not count that attempt as a pass or enable testability in the shipping configuration to hide the distinction. The local native prover archive supports arm64 simulators only. See the [Release build audit](docs/release-audit.md) for the build, bundle and DEBUG-surface evidence.
 
 For every UI change, also run:
 
