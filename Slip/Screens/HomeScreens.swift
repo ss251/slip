@@ -103,7 +103,7 @@ struct HomeScreen: View {
                 .font(SlipFont.title2)
                 .foregroundStyle(SlipColor.ink)
 
-            Text("Ask your crew something. Everyone seals a pick, then you open together.")
+            Text("Ask your crew something. Everyone seals a pick. Opening starts at the deadline.")
                 .font(SlipFont.subheadline)
                 .foregroundStyle(SlipColor.secondary)
                 .multilineTextAlignment(.center)
@@ -480,7 +480,7 @@ struct HowStepContent: Identifiable, Sendable {
         HowStepContent(number: "1", mark: .pick, title: "Pick in private", body: "You choose on your own iPhone. The pick never uploads."),
         HowStepContent(number: "2", mark: .seal, title: "Seal it", body: "Your phone proves the pick without showing it. Only the proof leaves."),
         HowStepContent(number: "3", mark: .roster, title: "Wait together", body: "Everyone sees who has sealed, never what. Nudge the stragglers."),
-        HowStepContent(number: "4", mark: .open, title: "Open together", body: "At the deadline every pick opens at once, each checked against its seal."),
+        HowStepContent(number: "4", mark: .open, title: "Open your pick", body: "Opening starts at the deadline. Each pick is checked against its seal when it opens."),
         HowStepContent(number: "5", mark: .score, title: "Keep score", body: "The steward calls what happened. Winners take a point, losers take the banter.")
     ]
 }

@@ -95,7 +95,7 @@ struct SealedRoomScreen: View {
                     PillButton(title: "Nudge Maya & Tomás", tone: .secondary) {
                         model.inform("This preview did not send a nudge to Maya or Tomás.")
                     }
-                    Text("Everyone opens together at Friday 21:00.")
+                    Text("Opening starts Friday 21:00.")
                         .font(SlipFont.footnote)
                         .foregroundStyle(SlipColor.secondary)
                         .multilineTextAlignment(.center)

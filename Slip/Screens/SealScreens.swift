@@ -336,7 +336,7 @@ struct TicketScreen: View {
                         fact("Transaction size", "\(networkReceipt.transactionBytes) bytes")
                     } else {
                     fact(receipt == nil && !postingLater ? "Left this iPhone" : "Sharing", receipt == nil && !postingLater ? "the proof, never the pick" : "Stays here in this local build")
-                    fact(receipt == nil ? "Opens" : "Retention", receipt == nil ? "Friday 21:00, with everyone" : "This app session only")
+                    fact(receipt == nil ? "Opens" : "Retention", receipt == nil ? "From Friday 21:00" : "This app session only")
                     }
                     if networkReceipt != nil {
                     } else if let receipt {

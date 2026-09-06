@@ -358,7 +358,7 @@ struct InviteScreen: View {
                     }
                     .padding(.top, SlipSpacing.large)
 
-                    Text("Sealed on your own iPhone, opened together. You can still peek at your own pick.")
+                    Text("Seal on your iPhone. Open after the deadline. You can still peek at your own pick.")
                         .font(SlipFont.footnote)
                         .foregroundStyle(SlipColor.secondary)
                         .multilineTextAlignment(.center)

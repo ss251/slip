@@ -116,7 +116,7 @@ substitute for an authenticated physical-device run.
 
 ## Design and documentation
 
-The [30 canonical v6 boards](docs/design/v6/) are losslessly compacted copies of the reviewed app snapshots, produced on 2026-09-05 after the Luma pass. They cover 24 routes plus three dark and three AX1 boards; v5 Paper boards are historical. Snapshot tests use serialized key-window rendering, 1× standard-range PNGs, light/dark, XL, AX1 and AX5. The 120 references total **11,193,650 bytes** after pixel-identical lossless compression; the comparison threshold remains **0.012**. Re-recording is explicit; see [testing](.claude/docs/testing.md).
+The [30 canonical v6 boards](docs/design/v6/) are losslessly compacted copies of the reviewed app snapshots, produced on 2026-09-05 after the Luma pass. They cover 24 routes plus three dark and three AX1 boards; v5 Paper boards are historical. Snapshot tests use serialized key-window rendering, 1× standard-range PNGs, light/dark, XL, AX1 and AX5. The 120 references total **11,191,393 bytes** after pixel-identical lossless compression; the comparison threshold remains **0.012**. Re-recording is explicit; see [testing](.claude/docs/testing.md).
 
 The [interactive explainer](docs/how-slip-works.html) distinguishes the current local build from the planned connected flow. It is an illustration, not a transaction receipt.
 

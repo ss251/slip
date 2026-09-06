@@ -43,7 +43,7 @@ struct HeadingAccessibilityTests {
     @Test("Guide step four reads the opening explanation without decorative Yes and No examples")
     func openingStepLabel() {
         #expect(HowStepContent.steps[3].accessibilityLabel ==
-                "Step 4. Open together. At the deadline every pick opens at once, each checked against its seal.")
+                "Step 4. Open your pick. Opening starts at the deadline. Each pick is checked against its seal when it opens.")
     }
 
     @Test("Guide step five reads the scoring explanation without a detached plus-one stop")
