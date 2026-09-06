@@ -764,7 +764,7 @@ struct ChallengeScreen: View {
                 HStack(alignment: .top, spacing: SlipSpacing.medium) {
                     InitialAvatar(name: "You")
                     VStack(alignment: .leading, spacing: SlipSpacing.tiny) {
-                        Text("Challenged by you").font(SlipFont.headline)
+                        Text("Your challenge will be public").font(SlipFont.headline)
                         Text("Your name stays on this for the whole crew to see.")
                             .font(SlipFont.footnote)
                             .foregroundStyle(SlipColor.secondary)
@@ -1050,7 +1050,7 @@ private struct LocalResultScreen: View {
                     detail: "A proved challenge voids this local round. Nobody scores. This is not a vote and there is no connected crew."
                 )
                 explanation(
-                    title: "Challenged by you",
+                    title: "Your identity will be recorded",
                     detail: "Your local player identity will be recorded in the sample’s public result. This uses the sample clock inside the challenge window."
                 )
             } else {
