@@ -15,6 +15,8 @@ settings:
     SWIFT_VERSION: 6.0
     SWIFT_STRICT_CONCURRENCY: complete
     IPHONEOS_DEPLOYMENT_TARGET: 17.0
+    # The local native prover archive supports the arm64 simulator only.
+    "ARCHS[sdk=iphonesimulator*]": arm64
     TARGETED_DEVICE_FAMILY: 1
     DEVELOPMENT_TEAM: L594CGSH6A
     CODE_SIGN_STYLE: Automatic
