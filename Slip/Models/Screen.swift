@@ -106,6 +106,62 @@ final class AppModel {
         localRound.id == roundID
     }
 
+    /// What accepting an invite did, so the UI can be honest about it.
+    enum JoinOutcome: Equatable {
+        /// Joined, and this device now points at the invite's relay and contract.
+        case joinedAndAdoptedNetwork
+        /// Joined the round, but this device is already configured for a *different*
+        /// relay or contract, so its network setup was left alone. Submitting would
+        /// go somewhere else, which the owner must resolve deliberately.
+        case joinedWithNetworkConflict(configuredContractHex: String)
+        /// Joined; network setup already matched, or the app is running proof-only.
+        case joined
+    }
+
+    /// Adopts a crew member's round instead of starting a new one. This is the whole
+    /// point of an invite: both phones must carry the *same* round id, or their seals
+    /// belong to two unrelated rounds and can never be opened together.
+    ///
+    /// Network setup is adopted only when it is absent or already identical. An invite
+    /// arrives from outside the app, so it must not be able to silently repoint a
+    /// configured device at another relay or contract.
+    @discardableResult
+    func join(invite: RoundInvite, defaults: UserDefaults = .standard) -> JoinOutcome {
+        // Re-tapping the link for the round we are already in must not disturb it. An
+        // invite lives in a group chat and gets tapped more than once; rebuilding the
+        // round here would reset its creation time and, worse, discard a seal already
+        // made in it.
+        let isRejoin = localRound.id == invite.roundID
+        if !isRejoin {
+            localRound = LocalRound(
+                id: invite.roundID,
+                question: invite.question,
+                sides: invite.sides,
+                crewName: invite.crewName,
+                sealDeadline: invite.sealDeadline
+            )
+            hasLocalSeal = false
+        }
+        sampleQuestion = localRound.question
+        sideLabels = localRound.sides
+        if !isRejoin, let firstSide = invite.sides.first { selectedSide = firstSide }
+        history.removeAll()
+        screen = .seal
+
+        let existing = NetworkSetup.load(defaults: defaults)
+        switch existing {
+        case .none:
+            NetworkSetup(relayURL: invite.relayURL,
+                         contractAddressHex: invite.contractAddressHex).save(defaults: defaults)
+            return .joinedAndAdoptedNetwork
+        case .some(let setup) where setup.contractAddressHex.lowercased() == invite.contractAddressHex.lowercased()
+            && setup.relayURL == invite.relayURL:
+            return .joined
+        case .some(let setup):
+            return .joinedWithNetworkConflict(configuredContractHex: setup.contractAddressHex)
+        }
+    }
+
     static func preview(_ screen: SlipScreen) -> AppModel {
         let model = AppModel()
         model.isPreview = true

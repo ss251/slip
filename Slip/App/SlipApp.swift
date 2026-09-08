@@ -97,6 +97,7 @@ struct SlipApp: App {
         WindowGroup {
             SlipRootView(model: model, flow: flow)
                 .environment(networkTracker)
+                .onOpenURL { url in accept(inviteURL: url) }
                 .preferredColorScheme(model.screen.usesDarkCanvas ? .dark : appearance)
                 #if DEBUG
                 .modifier(DebugLocalFixtureLaunch(fixture: localFixture, model: model, flow: flow))
@@ -104,6 +105,29 @@ struct SlipApp: App {
                 #endif
                 .modifier(DebugAccessibility(typeSize: typeSize, reduceMotion: reduceMotion,
                                              reduceTransparency: reduceTransparency, increaseContrast: increaseContrast))
+        }
+    }
+}
+
+
+extension SlipApp {
+    /// Handles `slip://join/<payload>`. Invites arrive from outside the app, so a bad
+    /// one must produce a plain message rather than a broken half-joined state.
+    @MainActor func accept(inviteURL url: URL) {
+        do {
+            let invite = try RoundInvite.decode(url: url)
+            switch model.join(invite: invite) {
+            case .joined, .joinedAndAdoptedNetwork:
+                model.inform("Joined \(invite.crewName). Seal before the deadline.")
+            case .joinedWithNetworkConflict:
+                model.inform("Joined \(invite.crewName), but this iPhone is set up for a different crew contract. Check Steward relay setup before sealing.")
+            }
+        } catch RoundInvite.InviteError.expired {
+            model.inform("That slip has already closed.")
+        } catch RoundInvite.InviteError.unsupportedVersion {
+            model.inform("That invite needs a newer version of Slip.")
+        } catch {
+            model.inform("That invite link isn't readable.")
         }
     }
 }
