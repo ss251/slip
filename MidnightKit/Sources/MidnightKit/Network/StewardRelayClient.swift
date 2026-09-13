@@ -59,13 +59,16 @@ public struct HTTPStewardRelay: StewardRelay {
     private static let maximumContextBytes = 16 * 1_024 * 1_024
     private static let maximumReceiptBytes = 64 * 1_024
     private static let redirectPolicy = RelayRedirectPolicy()
-    private static let defaultSession: URLSession = {
-        let configuration = URLSessionConfiguration.default
+    private static let defaultSession = makeDefaultSession(configuration: .default)
+
+    /// Internal factory lets regression tests use the production timeout policy with
+    /// a protocol-scoped fixture instead of globally intercepting the shared session.
+    static func makeDefaultSession(configuration: URLSessionConfiguration) -> URLSession {
         // Request timeouts reset when bytes arrive. Bound the entire transfer too,
         // so a drip-fed response cannot keep the default client occupied for days.
         configuration.timeoutIntervalForResource = 120
         return URLSession(configuration: configuration)
-    }()
+    }
 
     /// Supplied sessions retain their delegate and resource-timeout policy. The default
     /// session caps the entire transfer at 120 seconds, including a slowly delivered body.

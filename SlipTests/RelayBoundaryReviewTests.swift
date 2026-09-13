@@ -1,5 +1,5 @@
 import Foundation
-import MidnightKit
+@testable import MidnightKit
 import Testing
 @testable import Slip
 
@@ -186,9 +186,11 @@ struct RelayBoundaryReviewTests {
           .timeLimit(.minutes(3)),
           .enabled(if: ProcessInfo.processInfo.environment["SLIP_TEST_RELAY_DEADLINES"] == "1"))
     func defaultSessionBoundsDrippingResponse() async throws {
-        try #require(URLProtocol.registerClass(DrippingResponseStub.self))
-        defer { URLProtocol.unregisterClass(DrippingResponseStub.self) }
-        let relay = HTTPStewardRelay(baseURL: URL(string: "https://slow-relay.test")!)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DrippingResponseStub.self]
+        let session = HTTPStewardRelay.makeDefaultSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let relay = HTTPStewardRelay(baseURL: URL(string: "https://slow-relay.test")!, session: session)
         let started = ContinuousClock.now
         do {
             _ = try await relay.confirm(commitmentHex: String(repeating: "ab", count: 32))
