@@ -19,6 +19,19 @@ struct RelayBoundaryReviewTests {
         #expect(!valid.pending)
     }
 
+    @Test("receipt identifier length matches the relay's accepted boundary")
+    func boundsReceiptIdentifier() throws {
+        let maximum = String(repeating: "a", count: 512)
+        let valid = try JSONSerialization.data(withJSONObject: ["txId": maximum])
+        #expect(try JSONDecoder().decode(SubmissionReceipt.self, from: valid).txID == maximum)
+        for value in [maximum + "a", String(repeating: "😀", count: 257)] {
+            let data = try JSONSerialization.data(withJSONObject: ["txId": value])
+            #expect(throws: RelayError.malformedResponse("txId")) {
+                try JSONDecoder().decode(SubmissionReceipt.self, from: data)
+            }
+        }
+    }
+
     final class NonHTTPStub: URLProtocol, @unchecked Sendable {
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

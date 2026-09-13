@@ -22,7 +22,10 @@ public struct SubmissionReceipt: Sendable, Equatable, Decodable {
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         txID = try c.decode(String.self, forKey: .txID)
-        guard !txID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        // Match the trusted relay's 512-character identifier limit in UTF-16 units.
+        // This bounds text retained in a receipt; it is not a response-body size limit.
+        guard !txID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              txID.utf16.count <= 512 else {
             throw RelayError.malformedResponse("txId")
         }
         pending = false
