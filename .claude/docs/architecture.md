@@ -311,6 +311,9 @@ The Swift client rejects HTTP redirects and requires the configured relay URL to
 address the endpoints directly. It bounds response JSON to 16 MiB for context and
 64 KiB for submission/status, checking both declared and consumed size. These
 September 14 hardening changes have static review and unrun regression tests only.
+The default client session also caps a whole response transfer at 120 seconds;
+caller-supplied sessions retain their own resource-timeout policy. The per-request
+30-second read and 120-second submit timeouts are idle-data limits, not total budgets.
 
 Every work endpoint requires a fresh 32-byte bearer token. The server binds loopback by
 default; non-loopback binding needs an explicit opt-in and plain HTTP is limited to a

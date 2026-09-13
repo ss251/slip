@@ -152,6 +152,56 @@ struct RelayBoundaryReviewTests {
         }
     }
 
+    final class DrippingResponseStub: URLProtocol, @unchecked Sendable {
+        private let lock = NSLock()
+        private var stopped = false
+        private var worker: Task<Void, Never>?
+        override class func canInit(with request: URLRequest) -> Bool {
+            request.url?.host == "slow-relay.test"
+        }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200,
+                httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            let task = Task { [weak self] in
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    self.client?.urlProtocol(self, didLoad: Data([32]))
+                    do { try await Task.sleep(for: .seconds(1)) } catch { return }
+                }
+            }
+            lock.withLock {
+                if stopped { task.cancel() } else { worker = task }
+            }
+        }
+        override func stopLoading() {
+            lock.withLock { stopped = true; worker?.cancel(); worker = nil }
+        }
+    }
+
+    /// Deliberately opt-in: this checks the real default 120-second resource budget.
+    /// UNRUN during static review; it neither connects to a host nor generates a proof.
+    @Test("the default relay session times out a response that keeps delivering bytes",
+          .timeLimit(.minutes(3)),
+          .enabled(if: ProcessInfo.processInfo.environment["SLIP_TEST_RELAY_DEADLINES"] == "1"))
+    func defaultSessionBoundsDrippingResponse() async throws {
+        try #require(URLProtocol.registerClass(DrippingResponseStub.self))
+        defer { URLProtocol.unregisterClass(DrippingResponseStub.self) }
+        let relay = HTTPStewardRelay(baseURL: URL(string: "https://slow-relay.test")!)
+        let started = ContinuousClock.now
+        do {
+            _ = try await relay.confirm(commitmentHex: String(repeating: "ab", count: 32))
+            Issue.record("A never-ending response must time out")
+        } catch let error as URLError {
+            #expect(error.code == .timedOut)
+            let elapsed = ContinuousClock.now - started
+            // The stream delivers every second, so the 30-second idle timeout is not enough.
+            #expect(elapsed >= .seconds(100))
+            #expect(elapsed < .seconds(180))
+        }
+    }
+
     actor GatedContextRelay: StewardRelay {
         private var started = false
         private var startWaiters: [CheckedContinuation<Void, Never>] = []

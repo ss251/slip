@@ -30,6 +30,11 @@ validation gate; proving and submission checks remain outside that marker. A fut
 suite result that reports this known issue is not evidence of a working connected
 round. Establish real round binding before removing the marker.
 
+The unrun `defaultSessionBoundsDrippingResponse` regression is separately opt-in via
+`SLIP_TEST_RELAY_DEADLINES=1`: it uses a synthetic URLProtocol stream to exercise the
+real 120-second resource timeout and has a three-minute test limit. Its presence or
+normal-suite skip is not deadline-enforcement evidence.
+
 ## App-only simulator verification
 
 The default local-round service does not submit transactions or persist private picks. The optional network service submits proved transactions to a steward relay, stores its identity root in Keychain and relay configuration in UserDefaults. These are separate paths. Local proof tests exercise both legal

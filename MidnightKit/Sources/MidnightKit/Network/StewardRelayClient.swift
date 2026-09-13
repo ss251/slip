@@ -59,7 +59,20 @@ public struct HTTPStewardRelay: StewardRelay {
     private static let maximumContextBytes = 16 * 1_024 * 1_024
     private static let maximumReceiptBytes = 64 * 1_024
     private static let redirectPolicy = RelayRedirectPolicy()
-    public init(baseURL: URL, authToken: String? = nil, session: URLSession = .shared) { self.baseURL = baseURL; self.authToken = authToken; self.session = session }
+    private static let defaultSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        // Request timeouts reset when bytes arrive. Bound the entire transfer too,
+        // so a drip-fed response cannot keep the default client occupied for days.
+        configuration.timeoutIntervalForResource = 120
+        return URLSession(configuration: configuration)
+    }()
+
+    /// Supplied sessions retain their delegate and resource-timeout policy. The default
+    /// session caps the entire transfer at 120 seconds, including a slowly delivered body.
+    public init(baseURL: URL, authToken: String? = nil, session: URLSession? = nil) {
+        self.baseURL = baseURL; self.authToken = authToken
+        self.session = session ?? Self.defaultSession
+    }
 
     private func authorize(_ request: inout URLRequest) {
         if let authToken { request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization") }
