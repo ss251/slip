@@ -113,6 +113,45 @@ struct RelayBoundaryReviewTests {
         }
     }
 
+    final class RedirectStub: URLProtocol, @unchecked Sendable {
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            guard request.url?.host == "relay.test" else {
+                Issue.record("The client followed a relay redirect")
+                client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+                return
+            }
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer synthetic-token")
+            let destination = URL(string: "http://redirect-target.test/forwarded")!
+            let response = HTTPURLResponse(url: request.url!, statusCode: 307,
+                httpVersion: "HTTP/1.1", headerFields: ["Location": destination.absoluteString])!
+            var redirected = request
+            redirected.url = destination
+            client?.urlProtocol(self, wasRedirectedTo: redirected, redirectResponse: response)
+        }
+        override func stopLoading() {}
+    }
+
+    @Test("relay redirects cannot forward authenticated context, submit or confirmation requests")
+    func refusesRelayRedirects() async {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [RedirectStub.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let relay = HTTPStewardRelay(baseURL: URL(string: "https://relay.test")!,
+            authToken: "synthetic-token", session: session)
+        await #expect(throws: RelayError.badStatus(307)) {
+            _ = try await relay.context(for: String(repeating: "ab", count: 32))
+        }
+        await #expect(throws: RelayError.badStatus(307)) {
+            _ = try await relay.submit(provedTransaction: Data([1]))
+        }
+        await #expect(throws: RelayError.badStatus(307)) {
+            _ = try await relay.confirm(commitmentHex: String(repeating: "ab", count: 32))
+        }
+    }
+
     actor InvalidTimeRelay: StewardRelay {
         let time: UInt64
         private(set) var submissions = 0

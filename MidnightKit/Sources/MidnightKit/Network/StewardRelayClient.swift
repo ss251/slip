@@ -58,6 +58,7 @@ public struct HTTPStewardRelay: StewardRelay {
     // Transport ceilings, not promises about the maximum supported on-chain crew size.
     private static let maximumContextBytes = 16 * 1_024 * 1_024
     private static let maximumReceiptBytes = 64 * 1_024
+    private static let redirectPolicy = RelayRedirectPolicy()
     public init(baseURL: URL, authToken: String? = nil, session: URLSession = .shared) { self.baseURL = baseURL; self.authToken = authToken; self.session = session }
 
     private func authorize(_ request: inout URLRequest) {
@@ -122,7 +123,7 @@ public struct HTTPStewardRelay: StewardRelay {
     /// Check headers before reading and count actual bytes even without a trustworthy
     /// Content-Length. Cancelling on every exit also stops an oversized stream early.
     private func boundedData(for request: URLRequest, maximumBytes: Int) async throws -> Data {
-        let (bytes, response) = try await session.bytes(for: request)
+        let (bytes, response) = try await session.bytes(for: request, delegate: Self.redirectPolicy)
         defer { bytes.task.cancel() }
         try Self.check(response)
         guard response.expectedContentLength <= Int64(maximumBytes) else {
@@ -148,6 +149,18 @@ public struct HTTPStewardRelay: StewardRelay {
             throw RelayError.malformedResponse("httpResponse")
         }
         guard (200..<300).contains(http.statusCode) else { throw RelayError.badStatus(http.statusCode) }
+    }
+}
+
+/// Relay endpoints are direct. A redirect must not move the authenticated request or
+/// proved transaction to another URL (including an HTTPS-to-HTTP downgrade).
+/// Only redirect callbacks are intercepted; session authentication handling remains intact.
+private final class RelayRedirectPolicy: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        completionHandler(nil)
     }
 }
 

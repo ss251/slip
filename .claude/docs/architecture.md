@@ -307,6 +307,11 @@ echoes request bodies, proof bytes, tokens, keys or internal errors. The separat
 operator-only serve mode prints a one-time setup token and bounded diagnostics to its
 trusted local terminal.
 
+The Swift client rejects HTTP redirects and requires the configured relay URL to
+address the endpoints directly. It bounds response JSON to 16 MiB for context and
+64 KiB for submission/status, checking both declared and consumed size. These
+September 14 hardening changes have static review and unrun regression tests only.
+
 Every work endpoint requires a fresh 32-byte bearer token. The server binds loopback by
 default; non-loopback binding needs an explicit opt-in and plain HTTP is limited to a
 trusted local LAN/Tailscale developer demo—never public Wi-Fi, port forwarding or
