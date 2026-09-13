@@ -6,6 +6,17 @@ import Testing
 /// Static-review regressions. Written during the simulator-free review; not yet run.
 @Suite(.serialized)
 struct RelayBoundaryReviewTests {
+    @Test("wire hex rejects signed numeric pairs and non-ASCII characters")
+    func rejectsNonHexNumericSyntax() {
+        for malformed in ["+f", "-0", "ab+1", "0x+1", "0x-0", "ａｂ", "0g", "a", " ab "] {
+            #expect(Data(hex: malformed) == nil, "Non-hex wire syntax must not decode")
+        }
+        #expect(Data(hex: "00aBfF") == Data([0, 0xab, 0xff]))
+        #expect(Data(hex: "0x00aBfF") == Data([0, 0xab, 0xff]))
+        #expect(Data(hex: "") == Data())
+        #expect(Data(hex: "0x") == Data())
+    }
+
     @Test("a successful submit needs a nonempty transaction identifier")
     func rejectsEmptySuccessfulReceipt() throws {
         for value in ["", "   ", "\n"] {

@@ -184,7 +184,10 @@ extension Data {
     /// Strict hex decoding (even length, 0-9a-fA-F only, optional 0x).
     public init?(hex: String) {
         let h = hex.hasPrefix("0x") ? String(hex.dropFirst(2)) : hex
-        guard h.count % 2 == 0 else { return nil }
+        // Integer parsing accepts signs (including +f and -0); wire hex does not.
+        guard h.utf8.count % 2 == 0,
+              h.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0)
+                  || (97...102).contains($0) }) else { return nil }
         var out = Data(capacity: h.count / 2)
         var idx = h.startIndex
         while idx < h.endIndex {
