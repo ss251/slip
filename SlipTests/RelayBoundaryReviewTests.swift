@@ -174,13 +174,19 @@ struct RelayBoundaryReviewTests {
                 return
             }
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer synthetic-token")
-            // Serve the 307 the way a real server does and let URLSession's own redirect
-            // machinery run, so RelayRedirectPolicy is the thing under test. Signalling
-            // wasRedirectedTo(_:) by hand instead leaves the task with no completion, and
-            // it then hangs until timeoutIntervalForResource rather than failing.
+            // A custom URLProtocol OWNS redirect handling, so a terminal 3xx never reaches
+            // URLSession's redirect delegate — the client would simply reject it as non-2xx
+            // and this test would pass with RelayRedirectPolicy deleted. Signal the redirect,
+            // which is what invokes the policy, AND then complete the load, so a refusal
+            // terminates the task instead of hanging to timeoutIntervalForResource.
+            // Mutation-checked: removing the delegate makes this fail with
+            // "The client followed a relay redirect", so the oracle is real.
             let destination = URL(string: "http://redirect-target.test/forwarded")!
             let response = HTTPURLResponse(url: request.url!, statusCode: 307,
                 httpVersion: "HTTP/1.1", headerFields: ["Location": destination.absoluteString])!
+            var redirected = request
+            redirected.url = destination
+            client?.urlProtocol(self, wasRedirectedTo: redirected, redirectResponse: response)
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocolDidFinishLoading(self)
         }
