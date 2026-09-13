@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import Slip
 
-/// The join half of the two-device round: an invite must put the joiner in the
-/// creator's round, not a lookalike of it.
+/// Public invite import and local seal preservation. These tests do not establish
+/// membership or bind imported metadata to an on-chain round.
 @Suite(.serialized)
 struct RoundJoinTests {
     static func defaults(_ name: String = UUID().uuidString) -> UserDefaults {
@@ -13,7 +13,7 @@ struct RoundJoinTests {
     }
 
     @MainActor
-    @Test("joining adopts the invite's round id, so both devices seal into one round")
+    @Test("joining imports the invite’s local round id and presentation metadata")
     func joinAdoptsRoundIdentity() {
         let invite = RoundInviteTests.invite()
         let model = AppModel()
