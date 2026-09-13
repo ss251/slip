@@ -16,6 +16,14 @@ Evidence over assertion. Every feature lands with its tests; every summary quote
 4. **Planned connected end-to-end gate (local net)** — against `undeployed`: two devices complete a full round (create → both seal → deadline → reveal → settle). This is a required future connected-flow gate, not a currently demonstrated app capability. Existing local proofs, host relay runs and phone stub-relay tests do not establish it.
 5. **Design gate** — `scripts/design-gate.sh Slip/` on any UI diff (see `design.md`).
 
+## September 14 static-review changes
+
+The rejoin-identity, cached-ticket invalidation and bounded relay-response regressions
+in `RoundJoinTests.swift` and `RelayBoundaryReviewTests.swift` were written during a
+static-only review and have not been executed. Design/freshness gates establish only
+source conventions and pinned versions. Historical runtime results below do not
+validate these later changes. They need an explicitly authorized future runtime pass.
+
 ## App-only simulator verification
 
 The default local-round service does not submit transactions or persist private picks. The optional network service submits proved transactions to a steward relay, stores its identity root in Keychain and relay configuration in UserDefaults. These are separate paths. Local proof tests exercise both legal

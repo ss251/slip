@@ -39,6 +39,12 @@ A saved network configuration takes effect on a later launch, while local round
 metadata remains session-only. Do not treat tapping an invite as proof of joining a
 shared on-chain round.
 
+The configured network component is still experimental: its adapter currently omits
+the question commitment required by the app’s receipt validation, so submission can
+be followed by a failed UI result. Confirmation is queried once and is not durably
+reconciled. Component submission evidence below does not establish a working
+connected app round.
+
 ## Native proof and network evidence
 
 `ContractRuntime` executes compiler-generated JavaScript under JavaScriptCore. `Prover.prove(circuit:proofData:)` converts the private runtime transcript to a preimage in memory and generates the proof natively. Runtime input is never written out by the app.
