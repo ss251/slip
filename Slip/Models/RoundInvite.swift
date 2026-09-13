@@ -1,12 +1,10 @@
 import Foundation
 import MidnightKit
 
-/// What one phone must hand another so both seal into the *same* round.
+/// Public round metadata one phone can offer another.
 ///
-/// Today each install derives its round locally, so two phones that "join the same slip"
-/// actually create two unrelated rounds. An invite carries the round's identity — where to
-/// submit, which contract, which round, and the human context needed to render it — so the
-/// joiner adopts local presentation metadata. It does not enrol a member on chain.
+/// Import adopts a local presentation UUID and labels. It does not authenticate the
+/// metadata, bind that UUID to the contract's active round, or enrol a member on chain.
 ///
 /// **This payload is public.** It travels through whatever channel the crew already uses,
 /// so it carries no witness material: no choice, no salt, no device secret, and no relay
@@ -23,7 +21,7 @@ struct RoundInvite: Equatable, Sendable {
     /// Contract encoding: index 0 is choice `1`, index 1 is choice `0`.
     let sides: [String]
     let crewName: String
-    /// Keeps the crew's generated art identical on every member's screen.
+    /// Reserved public art key; current views derive their palette from the crew name.
     let paletteKey: String
     let sealDeadline: Date
 
@@ -143,7 +141,7 @@ extension RoundInvite {
         let deadline: Int
     }
 
-    /// RFC 4648 §5 without padding: safe in a URL path and in a QR alphanumeric run.
+    /// RFC 4648 §5 without padding: safe in a URL path and as QR text.
     static func base64URLEncode(_ data: Data) -> String {
         data.base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
