@@ -297,6 +297,44 @@ struct RoundJoinTests {
         #expect(tracker.receipt(for: original.roundID) == receipt)
     }
 
+    @MainActor
+    @Test("a local lookalike without an imported network binding cannot keep its seal")
+    func localLookalikeDoesNotAcquireNetworkBinding() {
+        let model = AppModel()
+        let local = model.localRound
+        let invite = RoundInvite(relayURL: URL(string: "https://relay.test")!,
+            contractAddressHex: String(repeating: "ab", count: 32), roundID: local.id,
+            question: local.question, sides: local.sides, crewName: local.crewName,
+            paletteKey: "unused", sealDeadline: local.sealDeadline)
+        let defaults = Self.defaults()
+        NetworkSetup(relayURL: invite.relayURL, contractAddressHex: invite.contractAddressHex)
+            .save(defaults: defaults)
+        #expect(model.markLocalSeal(roundID: local.id))
+        let revision = model.localRoundRevision
+        model.join(invite: invite, defaults: defaults)
+        #expect(!model.hasLocalSeal)
+        #expect(model.localRoundRevision != revision)
+    }
+
+    @MainActor
+    @Test("replacement also clears a departed round's cached private ticket")
+    func replacementClearsDepartedTicket() async {
+        let model = AppModel()
+        let flow = SealFlowModel { round, choice in Self.syntheticSeal(round, choice: choice) }
+        let previous = model.localRound
+        flow.beginSeal(round: previous, choice: 0)
+        await flow.waitForCurrentSeal()
+        flow.depart(roundID: previous.id)
+        model.startLocalRound(question: "Next?", sides: ["Yes", "No"], crewName: "Test")
+        #expect(flow.activeRoundID == nil)
+        #expect(flow.sealedDisplay?.roundID == previous.id)
+        model.join(invite: RoundInviteTests.invite(), defaults: Self.defaults(),
+                   beforeReplacingRound: { _ in flow.discard() })
+        #expect(flow.result == nil)
+        #expect(flow.sealedDisplay == nil)
+        #expect(flow.stage == .choosing)
+    }
+
     private nonisolated static func syntheticSeal(_ round: LocalRound, choice: UInt8) -> LocalSealResult {
         let index = choice == 1 ? 0 : 1
         return LocalSealResult(receipt: LocalSealReceipt(roundID: round.id,
