@@ -143,8 +143,8 @@ struct RoundInviteTests {
         }
     }
 
-    /// The privacy invariant, enforced on the one payload that is designed to be shared.
-    @Test("the payload carries no witness, secret or credential material")
+    /// Guards the public wire schema and this synthetic fixture, not arbitrary field values.
+    @Test("the invite schema has only public fields and the fixture contains no private material")
     func payloadCarriesNoPrivateMaterial() throws {
         let payload = try Self.invite().encodedPayload()
         let payloadData = try #require(RoundInvite.base64URLDecode(payload))
@@ -153,7 +153,8 @@ struct RoundInviteTests {
         for forbidden in ["salt", "choice", "secret", "witness", "token", "bearer", "pick", "commitment", "proof"] {
             #expect(!json.lowercased().contains(forbidden), "invite payload must not mention \(forbidden)")
         }
-        // The field set itself is the guarantee: exactly these keys, nothing more.
+        // This catches added wire fields. Callers must still keep private values out
+        // of public text and URL paths; key names cannot establish their provenance.
         let parsed = try JSONSerialization.jsonObject(with: payloadData)
         let object = try #require(parsed as? [String: Any])
         #expect(Set(object.keys) == ["v", "relay", "contract", "round", "question", "sides", "crew", "palette", "deadline"])
