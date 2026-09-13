@@ -30,7 +30,7 @@ enum NetworkSealAdapter {
                 #if DEBUG
                 // Diagnostics only: the error's type and code, never payload bytes, tokens or witness data.
                 let code = (error as? URLError)?.code.rawValue
-                print("network seal failed: \(type(of: error)).\(String(describing: error).prefix(80))\(code.map { " urlError=\($0)" } ?? "")")
+                print("network seal failed: \(type(of: error))\(code.map { " urlError=\($0)" } ?? "")")
                 #endif
                 throw error
             }
