@@ -41,7 +41,7 @@ struct NetworkSetup: Equatable, Sendable {
     }
     #endif
 
-    static func isAddress(_ hex: String) -> Bool { hex.count == 64 && Data(hex: hex) != nil }
+    static func isAddress(_ hex: String) -> Bool { hex.count == 64 && Data(hex: hex)?.count == 32 }
 }
 
 /// Holds the device secret the contract identifies this member by. The secret is the

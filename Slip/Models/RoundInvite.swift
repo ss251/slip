@@ -102,10 +102,10 @@ extension RoundInvite {
         guard wire.v == version else { throw InviteError.unsupportedVersion(wire.v) }
         guard let relay = URL(string: wire.relay), isPublicRelayURL(relay) else { throw InviteError.malformed }
         let contract = wire.contract.lowercased()
-        guard contract.count == 64, Data(hex: contract) != nil else { throw InviteError.malformed }
+        guard contract.count == 64, Data(hex: contract)?.count == 32 else { throw InviteError.malformed }
         guard let round = UUID(uuidString: wire.round) else { throw InviteError.malformed }
         guard !wire.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw InviteError.malformed }
-        guard wire.sides.count == 2, wire.sides.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        guard wire.sides.count == 2, wire.sides[0] != wire.sides[1], wire.sides.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
         else { throw InviteError.malformed }
         guard !wire.crew.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw InviteError.malformed }
 

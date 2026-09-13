@@ -111,6 +111,7 @@ struct RoundInviteTests {
         let mutations: [(String, Any)] = [
             ("contract", String(repeating: "ab", count: 31)),   // too short
             ("contract", String(repeating: "zz", count: 32)),   // not hex
+            ("contract", "0x" + String(repeating: "ab", count: 31)), // 64 chars, only 31 bytes
             ("relay", "ftp://relay.test"),                      // wrong scheme
             ("relay", "not a url at all"),
             ("round", "not-a-uuid"),
@@ -118,6 +119,7 @@ struct RoundInviteTests {
             ("crew", ""),
             ("sides", ["Yes"]),                                 // must be exactly two
             ("sides", ["Yes", "No", "Maybe"]),
+            ("sides", ["Yes", "Yes"]),                         // text-based selection cannot distinguish these
             ("sides", ["Yes", " "])
         ]
         for (key, value) in mutations {
@@ -207,6 +209,14 @@ struct RoundInviteTests {
             question: original.question, sides: original.sides, crewName: original.crewName,
             paletteKey: original.paletteKey, sealDeadline: Date(timeIntervalSince1970: .infinity))
         #expect(throws: RoundInvite.InviteError.malformed) { try invite.encodedPayload() }
+    }
+
+
+    @Test("network setup rejects a truncated address hidden behind the optional hex prefix")
+    func networkSetupRequires32Bytes() {
+        #expect(!NetworkSetup.isAddress("0x" + String(repeating: "ab", count: 31)))
+        #expect(NetworkSetup.isAddress(String(repeating: "ab", count: 32)))
+        #expect(NetworkSetup.isAddress(String(repeating: "AB", count: 32)))
     }
 
 }
