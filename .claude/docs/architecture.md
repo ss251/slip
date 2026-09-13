@@ -6,9 +6,9 @@
 iPhone (SwiftUI app)
  ├─ Slip UI  ── tokens/design system, no color/type literals
  ├─ MidnightKit (Swift + Rust staticlib)
- │    ├─ witness store   {choice, salt} — encrypted, device-only
+ │    ├─ witness memory  local picks are session-only; network identity is in Keychain
  │    ├─ prover          Compact circuits proved ON DEVICE (no proof server)
- │    └─ params/keys     fetched on demand + cached (k≈10 needs ~200KB BLS params)
+ │    └─ params/keys     bundled k13/k14 public artifacts; no app download fallback
  └─ network prototype ── fetches public context; hands a proved/pre-binding seal
                          to an authenticated trusted developer relay
 
@@ -44,12 +44,23 @@ Constraints that shape this design:
   verified: no `crossContractCall`, no contract types, no contract-typed ledger
   fields — and would not want to: a circuit reachable by a cross-contract call
   cannot call witnesses, and ours must.
-- Circuit size stays small (k≈10 class) → proving in ~100ms-class on device and tiny params. Don't add circuit complexity without re-checking `midnightkit.md` budgets.
+- Current circuits require k13/k14 public parameters. Proving measurements are dated, per-circuit observations in `midnightkit.md`, not a 100ms budget. Re-check them before changing circuit complexity.
 - Public ledger state is public: question commitment, seal commitments, reveal results, scores. Sides are hidden **until reveal, then public to the crew and chain** — that's the product contract, don't accidentally promise more.
 
-## Crew membership & invites (v1)
+## Crew membership & invites (current boundary)
 
-Invite link carries the contract address + round id (+ crew secret for membership proof if enabled). Rendezvous is the chain itself; the app polls the indexer for roster/reveal state. **Caveat: "no backend" no longer survives contact with fees.** Every circuit call costs DUST, and DUST sponsorship — the mechanism that lets a member transact holding nothing — requires a sponsor *wallet*, which the protocol will not let a contract be (*"Smart contracts do not hold or spend DUST"*). **Decided: DUST redesignation, no sponsor service.** See below. Push/notifications come later and must not require witness-adjacent data.
+`RoundInvite` carries public relay/contract identifiers, a presentation UUID, question,
+ordered sides, crew/palette and deadline. `AppModel.join` imports this metadata and
+may persist a previously absent network setup. It does not enroll a member, verify
+metadata against chain state, or replace the running sealing service. The contract's
+`enrollMember` is steward-only and refuses changes while a slip is open. Members
+must be enrolled before opening; a shared link is not self-service membership.
+
+The share UI, connected roster/reveal synchronization, and a complete two-device
+round remain planned. Invites must never contain crew secrets or relay credentials.
+The current experimental seal path uses a trusted developer relay for wallet
+balancing/signing/submission. The redesignation discussion below records an earlier
+funding design and host experiments, not a shipped member-wallet path.
 
 ## How members pay for transactions
 
@@ -251,6 +262,18 @@ only) but become load-bearing the moment stakes exist:
   invite-attestation or member-approval scheme before points count for anything.
 
 ## Disclosure ledger
+
+### Incoming round invites (static review, September 2026)
+
+The untrusted link contains only public metadata fields. Encoding and decoding reject
+URL userinfo, query and fragment data; field types do not prevent a caller putting a
+secret in arbitrary public text or URL paths. A 16 KiB encoded limit bounds decode
+work. No invite producer currently sources private witness data. Import writes
+relay/contract setup only when `NetworkSetup.load` is absent; partially invalid saved
+setup is also treated as absent. It does not establish network membership or verify
+round metadata, and configured conflicts still change local presentation. Those
+integration limitations must be resolved before claiming connected join support.
+
 
 ### Experimental native seal relay (September 2026)
 

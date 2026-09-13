@@ -28,7 +28,16 @@ Design previews of the intended crew flow. The sealed witness stays on device; a
 3. Call the outcome after the sample's opening window. Reveal, settlement and an optional challenge each execute the existing circuit and produce a native proof.
 4. See the public opening, outcome, local score and per-step timings. A challenge voids the outcome; the original opening remains intact.
 
-The actor retains the original device secret and pick only in memory. The circuit re-derives the same salt for reveal and rejects a flipped pick. Before opening, the pick is hidden by its commitment. On reveal the choice is deliberately public; the secret and derived salt stay local. There is no remote proving fallback, analytics or persistence. **Terminating the app loses this local session.** A proof of a matching opening is not a claim that nobody saw the unlocked phone.
+The actor retains the original device secret and pick only in memory. The circuit re-derives the same salt for reveal and rejects a flipped pick. Before opening, the pick is hidden by its commitment. On reveal the choice is deliberately public; the secret and derived salt stay local. This default local flow has no remote proving fallback, analytics or pick persistence. The optional network path persists its device identity in Keychain and relay configuration in UserDefaults. **Terminating the app loses this local session.** A proof of a matching opening is not a claim that nobody saw the unlocked phone.
+
+An incoming `slip://join/…` link currently imports public round metadata and may save
+relay/contract setup. It does **not** enroll the device on chain, authenticate that
+metadata, or rebuild the running sealing service. The steward must enroll each
+member before opening the round; `enrollMember` rejects enrollment while a slip is
+open. Share-invite UI and a complete connected join/reveal flow remain unimplemented.
+A saved network configuration takes effect on a later launch, while local round
+metadata remains session-only. Do not treat tapping an invite as proof of joining a
+shared on-chain round.
 
 ## Native proof and network evidence
 

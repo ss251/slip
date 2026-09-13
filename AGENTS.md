@@ -1,6 +1,6 @@
 # Slip — agent guide
 
-Sealed group predictions with friends. The current app proves a single-player local round: enroll, create, seal, reveal, settle and dispute. The circuit checks that an opening matches the original commitment. Connected crews are planned; a shared deadline creates an opening window, not guaranteed simultaneous arrivals. The proof does not establish that nobody saw an unlocked phone.
+Sealed group predictions with friends. The current app proves a single-player local round: enroll, create, seal, reveal, settle and dispute. The circuit checks that an opening matches the original commitment. Invite import adopts local metadata only: the steward must enroll a member before the round opens, and tapping a link does not establish on-chain membership. Connected crews are planned; a shared deadline creates an opening window, not guaranteed simultaneous arrivals. The proof does not establish that nobody saw an unlocked phone.
 
 Built on [Midnight](https://docs.midnight.network) (a privacy blockchain whose Compact language compiles to zero-knowledge circuits) with **on-device proof generation** via MidnightKit, our Swift/Rust proving layer.
 
@@ -48,7 +48,7 @@ Canonical shapes (compile syntax confirmed against official Midnight CI and the 
 - Compile contract: `compact compile contracts/slip.compact contracts/build` (sanity: `compact compile -- --version`; add `--skip-zk` while iterating; only when contract/artifact changes are authorized)
 - Contract tests: simulator-based TS tests (see `.claude/docs/testing.md`)
 - App preparation: `sh scripts/prepare-app-params.sh /path/to/existing/params` stages checksum-verified k13/k14 public files without network; then `xcodegen generate`.
-- App build/tests: `xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test` (serialized key-window snapshots; currently verified with iOS 27, not proof of older-runtime support)
+- App build/tests: `xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test` (serialized key-window snapshots; dated iOS 27.0, 18.6 and 17.5 evidence and limits are in `docs/runtime-compatibility.md`; those runs do not validate later changes)
 - Design gate (run on any UI diff): `scripts/design-gate.sh Slip/`
 
 ## Hard constraints — do not design around these, design *with* them
