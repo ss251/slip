@@ -21,7 +21,11 @@ public struct SubmissionReceipt: Sendable, Equatable, Decodable {
     enum CodingKeys: String, CodingKey { case txID = "txId" }
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        txID = try c.decode(String.self, forKey: .txID); pending = false
+        txID = try c.decode(String.self, forKey: .txID)
+        guard !txID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw RelayError.malformedResponse("txId")
+        }
+        pending = false
     }
 }
 
@@ -90,6 +94,8 @@ public struct HTTPStewardRelay: StewardRelay {
 
     private func get<T: Decodable>(_ path: String) async throws -> T {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        // Context/confirmation reads should not inherit an injected session's timeout.
+        request.timeoutInterval = 30
         authorize(&request)
         let (data, response) = try await session.data(for: request)
         try Self.check(response)
@@ -97,7 +103,10 @@ public struct HTTPStewardRelay: StewardRelay {
     }
 
     private static func check(_ response: URLResponse) throws {
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw RelayError.badStatus(http.statusCode) }
+        guard let http = response as? HTTPURLResponse else {
+            throw RelayError.malformedResponse("httpResponse")
+        }
+        guard (200..<300).contains(http.statusCode) else { throw RelayError.badStatus(http.statusCode) }
     }
 }
 
