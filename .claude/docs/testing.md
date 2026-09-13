@@ -13,12 +13,12 @@ Evidence over assertion. Every feature lands with its tests; every summary quote
 3. **App (SwiftUI)** — unit tests for round state machine; snapshot tests for every screen in light theme + Dynamic Type XL.
    - iOS 26 gotcha: snapshots must render via `drawHierarchyInKeyWindow`, and snapshot suites are `@Suite(.serialized)` — parallel window access flakes.
    - Unreachable states get `#if DEBUG` launch arguments so tests/screenshots can force them.
-4. **End-to-end (local net)** — against `undeployed`: two simulated devices complete a full round (create → both seal → deadline → reveal → settle). This is the demo-critical path; keep it green.
+4. **Planned connected end-to-end gate (local net)** — against `undeployed`: two devices complete a full round (create → both seal → deadline → reveal → settle). This is a required future connected-flow gate, not a currently demonstrated app capability. Existing local proofs, host relay runs and phone stub-relay tests do not establish it.
 5. **Design gate** — `scripts/design-gate.sh Slip/` on any UI diff (see `design.md`).
 
 ## App-only simulator verification
 
-The local app has no network or persistence path. Proof tests exercise both legal
+The default local-round service does not submit transactions or persist private picks. The optional network service submits proved transactions to a steward relay, stores its identity root in Keychain and relay configuration in UserDefaults. These are separate paths. Local proof tests exercise both legal
 picks and all six lifecycle circuits against the bundled runtime and prover. The
 mismatch test flips only the reveal witness, expects circuit rejection, then checks
 that replaying the accepted prefix allows the original opening. Local sample time
