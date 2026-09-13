@@ -5,7 +5,7 @@ import Testing
 
 @Suite(.serialized)
 struct NetworkSealAdapterTests {
-    @Test("a network seal renders through the existing ticket result and records tx id + commitment")
+    @Test("a network seal maps an adapter result and records tx id plus commitment")
     @MainActor
     func adapterMapsReceipt() async throws {
         let relay = NetworkSealingServiceTests.StubRelay()
@@ -23,6 +23,33 @@ struct NetworkSealAdapterTests {
         #expect(recorded.txID == "0xstub1")
         for _ in 0..<50 where tracker.confirmations[round.id] == nil { try await Task.sleep(for: .milliseconds(20)) }
         #expect(tracker.confirmations[round.id] == .confirmed)
+    }
+
+    /// Unlike adapterMapsReceipt, this crosses the actual presentation validation gate.
+    /// Written during static review, UNRUN; it will generate a native proof when authorized.
+    @Test("a submitted network receipt must survive the flow's metadata validation")
+    @MainActor
+    func submittedReceiptReachesFlow() async throws {
+        let relay = NetworkSealingServiceTests.StubRelay()
+        let tracker = NetworkSealTracker(relayHost: "relay.test")
+        let flow = SealFlowModel(sealOperation: NetworkSealAdapter.operation(
+            service: NetworkSealingServiceTests.service(relay: relay), tracker: tracker))
+        let created = Date(timeIntervalSince1970: 1_788_000_000)
+        let round = LocalRound(question: "Synthetic network round?", sides: ["Yes", "No"],
+            crewName: "Test crew", createdAt: created, sealDeadline: created.addingTimeInterval(3_600))
+        flow.beginSeal(round: round, choice: 1)
+        await flow.waitForCurrentSeal()
+
+        // Proving/submission failures are not the known issue and must fail this test.
+        let submitted = try #require(tracker.receipt(for: round.id))
+        #expect(submitted.txID == "0xstub1")
+        #expect(submitted.commitment.count == 32)
+        #expect(relay.submitted.count == 1)
+        // The adapter currently supplies an empty questionCommitment. Remove this marker
+        // only when real round binding is established; do not bypass metadataMatches.
+        withKnownIssue("Network adapter omits the round commitment required by SealFlowModel") {
+            #expect(flow.stage == .sealed)
+        }
     }
 
     @Test("device identity is generated once and reused")
