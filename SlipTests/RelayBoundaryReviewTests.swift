@@ -1,6 +1,7 @@
 import Foundation
 import MidnightKit
 import Testing
+@testable import Slip
 
 /// Static-review regressions. Written during the simulator-free review; not yet run.
 @Suite(.serialized)
@@ -44,4 +45,35 @@ struct RelayBoundaryReviewTests {
             _ = try await relay.confirm(commitmentHex: String(repeating: "ab", count: 32))
         }
     }
+
+    actor InvalidTimeRelay: StewardRelay {
+        let time: UInt64
+        private(set) var submissions = 0
+        init(time: UInt64) { self.time = time }
+        func context(for contractAddressHex: String) async throws -> NetworkContext {
+            // Deliberately invalid state: time must be rejected before native state loading.
+            NetworkContext(contractAddressHex: contractAddressHex, contractState: Data(), blockTime: time)
+        }
+        func submit(provedTransaction: Data) async throws -> SubmissionReceipt {
+            submissions += 1
+            return SubmissionReceipt(txID: "unexpected")
+        }
+        func confirm(commitmentHex: String) async throws -> ConfirmationStatus { .pending }
+    }
+
+    @Test("unsafe relay times fail before native execution or submission")
+    func rejectsUnsafeBlockTimes() async {
+        for time in [UInt64(9_007_199_254_739_192), 9_007_199_254_740_992, UInt64.max] {
+            let relay = InvalidTimeRelay(time: time)
+            let service = NetworkSealingService(relay: relay,
+                prover: Prover(artifacts: LocalSealingService.bundledArtifacts()),
+                contractAddressHex: String(repeating: "ab", count: 32),
+                deviceSecret: Data(repeating: 2, count: 32))
+            await #expect(throws: NetworkSealError.invalidBlockTime) {
+                _ = try await service.seal(choice: 1)
+            }
+            #expect(await relay.submissions == 0)
+        }
+    }
+
 }

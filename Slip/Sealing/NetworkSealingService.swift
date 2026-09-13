@@ -13,6 +13,7 @@ struct NetworkSealReceipt: Sendable, Equatable {
 }
 
 enum NetworkSealError: Error, Equatable, Sendable {
+    case invalidBlockTime
     case invalidChoice
     case commitmentUnavailable
     case sealInProgress
@@ -30,6 +31,8 @@ actor NetworkSealingService {
     private let deviceSecret: Data
     private var sealing = false
     private static let ttlSeconds: UInt64 = 1_800
+    // The driver creates a JavaScript Number before converting block time to BigInt.
+    private static let maximumExactJavaScriptInteger: UInt64 = 9_007_199_254_740_991
 
     init(relay: any StewardRelay, prover: Prover, contractAddressHex: String, networkID: String = "undeployed", deviceSecret: Data) {
         precondition(deviceSecret.count == 32, "device secret must be 32 bytes")
@@ -54,6 +57,10 @@ actor NetworkSealingService {
         sealing = true; defer { sealing = false }
 
         let context = try await relay.context(for: contractAddressHex)
+        // Reject before private execution. This also makes the later TTL addition safe.
+        guard context.blockTime <= Self.maximumExactJavaScriptInteger - Self.ttlSeconds else {
+            throw NetworkSealError.invalidBlockTime
+        }
         let started = ContinuousClock.now
         let rt = try ContractRuntime()
         let stateExpr = try rt.loadContractState(context.contractState)
