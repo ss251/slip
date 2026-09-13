@@ -154,6 +154,32 @@ struct RoundJoinTests {
         }
     }
 
+    @MainActor
+    @Test("an invite preserves incomplete or invalid saved network settings")
+    func partialConfigurationIsNotAbsent() {
+        let keys = [NetworkSetup.relayKey, NetworkSetup.contractKey, NetworkSetup.tokenKey]
+        let configurations: [[String: Any]] = [
+            [NetworkSetup.relayKey: "https://original-relay.test"],
+            [NetworkSetup.contractKey: String(repeating: "ab", count: 32)],
+            [NetworkSetup.tokenKey: "existing-token"],
+            [NetworkSetup.relayKey: "https://original-relay.test",
+             NetworkSetup.contractKey: "invalid", NetworkSetup.tokenKey: "existing-token"],
+            [NetworkSetup.relayKey: 42, NetworkSetup.contractKey: "invalid"]
+        ]
+        for configuration in configurations {
+            let defaults = Self.defaults()
+            for (key, value) in configuration { defaults.set(value, forKey: key) }
+            #expect(NetworkSetup.load(defaults: defaults) == nil)
+            let expectedContract = defaults.string(forKey: NetworkSetup.contractKey) ?? ""
+            let outcome = AppModel().join(invite: RoundInviteTests.invite(), defaults: defaults)
+            #expect(outcome == .joinedWithNetworkConflict(configuredContractHex: expectedContract))
+            let after = Dictionary(uniqueKeysWithValues: keys.compactMap { key in
+                defaults.object(forKey: key).map { (key, $0) }
+            })
+            #expect(NSDictionary(dictionary: configuration).isEqual(to: after))
+        }
+    }
+
     enum ChangedField: CaseIterable, Equatable, Sendable {
         case roundID, contract, relay, question, sides, deadline, crew
     }

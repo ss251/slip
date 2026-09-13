@@ -121,7 +121,7 @@ final class AppModel {
     enum JoinOutcome: Equatable {
         /// Joined, and this device now points at the invite's relay and contract.
         case joinedAndAdoptedNetwork
-        /// Joined the round, but this device is already configured for a *different*
+        /// Joined the round, but saved setup is incomplete or points to a *different*
         /// relay or contract, so its network setup was left alone. Submitting would
         /// go somewhere else, which the owner must resolve deliberately.
         case joinedWithNetworkConflict(configuredContractHex: String)
@@ -178,6 +178,12 @@ final class AppModel {
         screen = .seal
 
         switch existing {
+        case .none where [NetworkSetup.relayKey, NetworkSetup.contractKey, NetworkSetup.tokenKey]
+            .contains(where: { defaults.object(forKey: $0) != nil }):
+            // Invalid/partial settings are still configured state, not permission for
+            // an external link to overwrite the endpoint or erase its bearer token.
+            return .joinedWithNetworkConflict(
+                configuredContractHex: defaults.string(forKey: NetworkSetup.contractKey) ?? "")
         case .none:
             NetworkSetup(relayURL: invite.relayURL,
                          contractAddressHex: invite.contractAddressHex).save(defaults: defaults)

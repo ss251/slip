@@ -269,8 +269,8 @@ The untrusted link contains only public metadata fields. Encoding and decoding r
 URL userinfo, query and fragment data; field types do not prevent a caller putting a
 secret in arbitrary public text or URL paths. A 16 KiB encoded limit bounds decode
 work. No invite producer currently sources private witness data. Import writes
-relay/contract setup only when `NetworkSetup.load` is absent; partially invalid saved
-setup is also treated as absent. It does not establish network membership or verify
+relay/contract setup only when all saved network fields are absent; invalid or partial
+settings are preserved as a configuration conflict until explicitly cleared. It does not establish network membership or verify
 round metadata, and configured conflicts still change local presentation. Those
 integration limitations must be resolved before claiming connected join support.
 
