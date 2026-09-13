@@ -19,11 +19,12 @@ Evidence over assertion. Every feature lands with its tests; every summary quote
 ## September 14 static-review changes
 
 The rejoin-identity, cached-ticket invalidation and bounded relay-response regressions
-were written during a static-only review. A separate verification report in commit
-`5f4eb49` records 138 tests in 22 suites passing after 119.973 seconds with one known
-issue, after fixing a Swift concurrency compile error and a hanging redirect fixture.
-The static review did not reproduce that run. It does not cover later changes,
-including the strict-hex fix `429f976` and invite/configuration cases in `c58a896`.
+were written during a static-only review. Separate verification fixed a Swift
+concurrency compile error and a hanging redirect fixture in `5f4eb49`. The later
+report in `4382f6d` records 140 tests in 22 suites passing after 121.205 seconds with
+one known issue. That tree includes the strict-hex fix `429f976` and invite/configuration
+cases in `c58a896`. The static review did not reproduce these runs; their evidence
+is scoped to the reported commits.
 Design/freshness gates establish source conventions and pinned versions, not that
 the current test target compiles or passes.
 
@@ -39,12 +40,12 @@ real 120-second resource timeout and has a three-minute test limit. Its presence
 normal-suite skip is not deadline-enforcement evidence. The report above does not
 establish that the opt-in flag was enabled.
 
-The corrected `refusesRelayRedirects` fixture delivers a terminal HTTP 307 response.
-Its passing status assertion alone does not establish that the redirect delegate ran:
-the client rejects a terminal 307 independently. Redirect-prevention evidence still
-needs an executable check that fails when the policy is removed, ideally using a
-loopback HTTP redirect and a destination request counter. This is a test-coverage
-limitation, not evidence that the production policy follows redirects.
+The earlier `refusesRelayRedirects` fixture delivered only a terminal HTTP 307, which
+the client rejects independently of its redirect delegate. Commit `4382f6d` now
+signals a redirect and completes the load. Its separate verification report records
+the decisive control: removing the policy fails with “The client followed a relay
+redirect”; restoring it passes the focused suite. This closes the fixture's reported
+oracle gap for that tested configuration. It is not a live two-device relay test.
 
 ## App-only simulator verification
 
