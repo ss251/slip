@@ -2,7 +2,7 @@
 # Slip design gate — mechanical enforcement of .claude/docs/design.md.
 # Usage: scripts/design-gate.sh [src-dir]   (exit 0 pass / 1 fail)
 SRC="${1:-Slip}"
-[ -d "$SRC" ] || { echo "design gate: source dir '$SRC' not found (pre-scaffold?) — nothing to check"; exit 0; }
+[ -d "$SRC" ] || { echo "design gate: FAIL — source dir '$SRC' not found"; exit 1; }
 fail=0
 say() { printf '  [%s] %s\n' "$1" "$2"; fail=1; }
 
