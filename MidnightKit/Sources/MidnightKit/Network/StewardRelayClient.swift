@@ -60,10 +60,22 @@ public struct HTTPStewardRelay: StewardRelay {
     private struct ContextDTO: Decodable { let address: String; let stateHex: String; let blockTimeSecs: UInt64 }
     private struct ConfirmDTO: Decodable { let status: ConfirmationStatus }
 
+    /// The relay is not trusted with the shape of what it returns. `address` is carried into
+    /// a JavaScript string literal in the sealing driver — in the same scope as the device
+    /// secret and the pick — so a quote-bearing address would be script injection with the
+    /// witness in reach. It must be 64 lowercase hex characters, and it must be the contract
+    /// we asked about: a relay may not silently redirect a seal at a different contract.
     public func context(for contractAddressHex: String) async throws -> NetworkContext {
         let dto: ContextDTO = try await get("context/\(contractAddressHex)")
+        // ASCII explicitly: `Character.isHexDigit` also accepts full-width forms, which are
+        // not what we mean by hex and not what the JavaScript literal should ever receive.
+        let address = dto.address.lowercased()
+        guard address.utf8.count == 64,
+              address.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
+              address == contractAddressHex.lowercased()
+        else { throw RelayError.malformedResponse("address") }
         guard let state = Data(hex: dto.stateHex) else { throw RelayError.malformedResponse("stateHex") }
-        return NetworkContext(contractAddressHex: dto.address, contractState: state, blockTime: dto.blockTimeSecs)
+        return NetworkContext(contractAddressHex: address, contractState: state, blockTime: dto.blockTimeSecs)
     }
 
     public func submit(provedTransaction: Data) async throws -> SubmissionReceipt {

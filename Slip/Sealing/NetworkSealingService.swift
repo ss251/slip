@@ -17,6 +17,8 @@ enum NetworkSealError: Error, Equatable, Sendable {
     case invalidChoice
     case commitmentUnavailable
     case sealInProgress
+    /// The relay answered with a contract address that is not 64 lowercase hex characters.
+    case relayContextRejected
 }
 
 /// The network path. Everything the steward relay learns is public: the member id (a
@@ -61,6 +63,12 @@ actor NetworkSealingService {
         guard context.blockTime <= Self.maximumExactJavaScriptInteger - Self.ttlSeconds else {
             throw NetworkSealError.invalidBlockTime
         }
+        // Defence in depth. The relay client already rejects a non-hex address, but this
+        // value reaches a JavaScript string literal that also holds the device secret and
+        // the pick, so the dangerous site refuses it too rather than trusting its caller.
+        guard context.contractAddressHex.utf8.count == 64,
+              context.contractAddressHex.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
+        else { throw NetworkSealError.relayContextRejected }
         let started = ContinuousClock.now
         let rt = try ContractRuntime()
         let stateExpr = try rt.loadContractState(context.contractState)

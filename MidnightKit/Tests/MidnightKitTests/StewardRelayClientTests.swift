@@ -37,6 +37,39 @@ struct StewardRelayClientTests {
         #expect(ctx.blockTime == 1_788_000_600)
     }
 
+    /// The relay's `address` is carried into a JavaScript string literal alongside the
+    /// device secret and the pick. A relay that answers with a quote, the wrong contract,
+    /// or anything but 64 lowercase hex characters is refused here, before any of that.
+    @Test("a relay may not answer with a quoted, mismatched or non-hex contract address")
+    func contextRejectsHostileAddress() async throws {
+        let asked = String(repeating: "11", count: 32)
+        let hostile = [
+            #"aa'; throw new Error('x'); //"#,          // script injection
+            String(repeating: "22", count: 32),          // valid hex, but not the contract we asked for
+            String(repeating: "11", count: 31),          // too short
+            String(repeating: "11", count: 32) + "1",    // too long
+            String(repeating: "zz", count: 32),          // not hex
+            String(repeating: "１", count: 64),           // full-width digits: isHexDigit says yes, we say no
+            ""
+        ]
+        for address in hostile {
+            Stub.handler = { _ in (200, Data(#"{"address":"\#(address)","stateHex":"0a0b0c","blockTimeSecs":1788000600}"#.utf8)) }
+            await #expect(throws: RelayError.malformedResponse("address"), "address \(address) should be refused") {
+                _ = try await Self.relay().context(for: asked)
+            }
+        }
+    }
+
+    /// An uppercase answer is the same contract, so it is accepted and normalised rather
+    /// than refused — the rule is about the character set reaching JavaScript, not casing.
+    @Test("an uppercase address is normalised, not rejected")
+    func contextNormalisesCase() async throws {
+        let asked = String(repeating: "ab", count: 32)
+        Stub.handler = { _ in (200, Data(#"{"address":"\#(asked.uppercased())","stateHex":"0a0b0c","blockTimeSecs":1788000600}"#.utf8)) }
+        let ctx = try await Self.relay().context(for: asked)
+        #expect(ctx.contractAddressHex == asked)
+    }
+
     @Test("submit posts the raw proved transaction and returns the tx id")
     func submit() async throws {
         Stub.handler = { req in

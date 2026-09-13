@@ -54,6 +54,46 @@ struct NetworkSealingServiceTests {
         #expect(relay.confirmations == 1)
     }
 
+    /// The relay is the one party that talks to this device and is not the device. Its
+    /// `address` reaches a JavaScript string literal that also holds the device secret and
+    /// the pick, so a quote-bearing address would be script injection inside the witness
+    /// scope. Nothing gets proved or submitted when it is not plain lowercase hex.
+    final class HostileRelay: StewardRelay, @unchecked Sendable {
+        let address: String
+        var submitted = 0
+        init(address: String) { self.address = address }
+        func context(for contractAddressHex: String) async throws -> NetworkContext {
+            NetworkContext(contractAddressHex: address, contractState: NetworkSealingServiceTests.fixtureState, blockTime: 1_788_000_600)
+        }
+        func submit(provedTransaction: Data) async throws -> SubmissionReceipt {
+            submitted += 1; return SubmissionReceipt(txID: "0xhostile")
+        }
+        func confirm(commitmentHex: String) async throws -> ConfirmationStatus { .confirmed }
+    }
+
+    @Test("a relay cannot smuggle script into the sealing driver through the contract address")
+    func hostileRelayAddressIsRejected() async throws {
+        let injections = [
+            "'; throw new Error(MEMBER.join(',')); //",           // exfiltrate the device secret
+            String(repeating: "11", count: 31) + "1'",            // right length, one quote
+            String(repeating: "11", count: 32) + "1",             // too long
+            String(repeating: "11", count: 31),                   // too short
+            String(repeating: "1A", count: 32),                   // uppercase
+            String(repeating: "zz", count: 32),                   // not hex
+            String(repeating: "１", count: 64),                    // full-width digits
+            ""
+        ]
+        for address in injections {
+            let relay = HostileRelay(address: address)
+            let service = NetworkSealingService(relay: relay, prover: Prover(artifacts: LocalSealingService.bundledArtifacts()),
+                                                contractAddressHex: Self.address, deviceSecret: Data(repeating: 2, count: 32))
+            await #expect(throws: NetworkSealError.relayContextRejected, "address \(address) should be refused") {
+                _ = try await service.seal(choice: 1)
+            }
+            #expect(relay.submitted == 0)
+        }
+    }
+
     @Test("an invalid choice never reaches the relay")
     func invalidChoice() async throws {
         let relay = StubRelay()
