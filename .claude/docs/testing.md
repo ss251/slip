@@ -19,21 +19,25 @@ Evidence over assertion. Every feature lands with its tests; every summary quote
 ## September 14 static-review changes
 
 The rejoin-identity, cached-ticket invalidation and bounded relay-response regressions
-in `RoundJoinTests.swift` and `RelayBoundaryReviewTests.swift` were written during a
-static-only review and have not been executed. Design/freshness gates establish only
-source conventions and pinned versions. Historical runtime results below do not
-validate these later changes. They need an explicitly authorized future runtime pass.
+were written during a static-only review. A separate verification report in commit
+`5f4eb49` records 138 tests in 22 suites passing after 119.973 seconds with one known
+issue, after fixing a Swift concurrency compile error and a hanging redirect fixture.
+The static review did not reproduce that run. It does not cover later changes,
+including the strict-hex fix `429f976` and invite/configuration cases in `c58a896`.
+Design/freshness gates establish source conventions and pinned versions, not that
+the current test target compiles or passes.
 
-`NetworkSealAdapterTests.submittedReceiptReachesFlow` is also unrun. Its
-`withKnownIssue` marks the adapter’s missing question commitment at the presentation
-validation gate; proving and submission checks remain outside that marker. A future
+`NetworkSealAdapterTests.submittedReceiptReachesFlow` uses
+`withKnownIssue` to mark the adapter’s missing question commitment at the presentation
+validation gate; proving and submission checks remain outside that marker. A
 suite result that reports this known issue is not evidence of a working connected
 round. Establish real round binding before removing the marker.
 
-The unrun `defaultSessionBoundsDrippingResponse` regression is separately opt-in via
+`defaultSessionBoundsDrippingResponse` is separately opt-in via
 `SLIP_TEST_RELAY_DEADLINES=1`: it uses a synthetic URLProtocol stream to exercise the
 real 120-second resource timeout and has a three-minute test limit. Its presence or
-normal-suite skip is not deadline-enforcement evidence.
+normal-suite skip is not deadline-enforcement evidence. The report above does not
+establish that the opt-in flag was enabled.
 
 ## App-only simulator verification
 
