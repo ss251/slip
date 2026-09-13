@@ -122,8 +122,8 @@ final class AppModel {
         /// Joined, and this device now points at the invite's relay and contract.
         case joinedAndAdoptedNetwork
         /// Joined the round, but saved setup is incomplete or points to a *different*
-        /// relay or contract, so its network setup was left alone. Submitting would
-        /// go somewhere else, which the owner must resolve deliberately.
+        /// relay or contract, so its network setup was left alone. The running flow
+        /// is not reconfigured by import; this does not establish connected readiness.
         case joinedWithNetworkConflict(configuredContractHex: String)
         /// Joined; network setup already matched, or the app is running proof-only.
         case joined

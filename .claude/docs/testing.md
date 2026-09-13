@@ -24,6 +24,12 @@ static-only review and have not been executed. Design/freshness gates establish 
 source conventions and pinned versions. Historical runtime results below do not
 validate these later changes. They need an explicitly authorized future runtime pass.
 
+`NetworkSealAdapterTests.submittedReceiptReachesFlow` is also unrun. Its
+`withKnownIssue` marks the adapter’s missing question commitment at the presentation
+validation gate; proving and submission checks remain outside that marker. A future
+suite result that reports this known issue is not evidence of a working connected
+round. Establish real round binding before removing the marker.
+
 ## App-only simulator verification
 
 The default local-round service does not submit transactions or persist private picks. The optional network service submits proved transactions to a steward relay, stores its identity root in Keychain and relay configuration in UserDefaults. These are separate paths. Local proof tests exercise both legal
