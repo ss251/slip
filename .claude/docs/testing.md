@@ -39,6 +39,13 @@ real 120-second resource timeout and has a three-minute test limit. Its presence
 normal-suite skip is not deadline-enforcement evidence. The report above does not
 establish that the opt-in flag was enabled.
 
+The corrected `refusesRelayRedirects` fixture delivers a terminal HTTP 307 response.
+Its passing status assertion alone does not establish that the redirect delegate ran:
+the client rejects a terminal 307 independently. Redirect-prevention evidence still
+needs an executable check that fails when the policy is removed, ideally using a
+loopback HTTP redirect and a destination request counter. This is a test-coverage
+limitation, not evidence that the production policy follows redirects.
+
 ## App-only simulator verification
 
 The default local-round service does not submit transactions or persist private picks. The optional network service submits proved transactions to a steward relay, stores its identity root in Keychain and relay configuration in UserDefaults. These are separate paths. Local proof tests exercise both legal
