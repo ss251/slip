@@ -163,12 +163,15 @@ struct RelayBoundaryReviewTests {
                 return
             }
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer synthetic-token")
+            // Serve the 307 the way a real server does and let URLSession's own redirect
+            // machinery run, so RelayRedirectPolicy is the thing under test. Signalling
+            // wasRedirectedTo(_:) by hand instead leaves the task with no completion, and
+            // it then hangs until timeoutIntervalForResource rather than failing.
             let destination = URL(string: "http://redirect-target.test/forwarded")!
             let response = HTTPURLResponse(url: request.url!, statusCode: 307,
                 httpVersion: "HTTP/1.1", headerFields: ["Location": destination.absoluteString])!
-            var redirected = request
-            redirected.url = destination
-            client?.urlProtocol(self, wasRedirectedTo: redirected, redirectResponse: response)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocolDidFinishLoading(self)
         }
         override func stopLoading() {}
     }
@@ -204,10 +207,14 @@ struct RelayBoundaryReviewTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200,
                 httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            let task = Task { [weak self] in
+            // URLProtocol and URLProtocolClient are not Sendable, so region isolation
+            // rejects a closure that captures them even though this stub is @unchecked
+            // Sendable. The stub is driven by one loading task at a time; stopLoading()
+            // cancels under the same lock that publishes the worker.
+            nonisolated(unsafe) let host = self
+            let task = Task {
                 while !Task.isCancelled {
-                    guard let self else { return }
-                    self.client?.urlProtocol(self, didLoad: Data([32]))
+                    host.client?.urlProtocol(host, didLoad: Data([32]))
                     do { try await Task.sleep(for: .seconds(1)) } catch { return }
                 }
             }
