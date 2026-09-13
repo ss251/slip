@@ -113,6 +113,46 @@ struct RelayBoundaryReviewTests {
         }
     }
 
+    final class ContextSizeStub: URLProtocol, @unchecked Sendable {
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            let url = request.url!
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            let address = url.lastPathComponent
+            let json = #"{"address":"\#(address)","stateHex":"010203","blockTimeSecs":1}"#
+            var data = Data(json.utf8)
+            let count = 16 * 1_024 * 1_024 + (url.host == "over-context-limit.test" ? 1 : 0)
+            data.append(Data(repeating: 32, count: count - data.count))
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        override func stopLoading() {}
+    }
+
+    @Test("context streaming uses its own larger bound even without Content-Length",
+          .timeLimit(.minutes(1)), arguments: ["at-context-limit.test", "over-context-limit.test"])
+    func boundsActualContextStream(_ host: String) async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [ContextSizeStub.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let relay = HTTPStewardRelay(baseURL: URL(string: "https://\(host)")!, session: session)
+        let address = String(repeating: "ab", count: 32)
+        if host == "at-context-limit.test" {
+            let context = try await relay.context(for: address)
+            #expect(context.contractAddressHex == address)
+            #expect(context.contractState == Data([1, 2, 3]))
+            #expect(context.blockTime == 1)
+        } else {
+            await #expect(throws: RelayError.malformedResponse("responseSize")) {
+                _ = try await relay.context(for: address)
+            }
+        }
+    }
+
     final class RedirectStub: URLProtocol, @unchecked Sendable {
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
