@@ -164,6 +164,12 @@ struct RoundJoinTests {
             [NetworkSetup.tokenKey: "existing-token"],
             [NetworkSetup.relayKey: "https://original-relay.test",
              NetworkSetup.contractKey: "invalid", NetworkSetup.tokenKey: "existing-token"],
+            [NetworkSetup.relayKey: "https://original-relay.test",
+             NetworkSetup.contractKey: String(repeating: "+f", count: 32),
+             NetworkSetup.tokenKey: "existing-token"],
+            [NetworkSetup.relayKey: "https://original-relay.test",
+             NetworkSetup.contractKey: String(repeating: "-0", count: 32),
+             NetworkSetup.tokenKey: "existing-token"],
             [NetworkSetup.relayKey: 42, NetworkSetup.contractKey: "invalid"]
         ]
         for configuration in configurations {

@@ -112,6 +112,8 @@ struct RoundInviteTests {
             ("contract", String(repeating: "ab", count: 31)),   // too short
             ("contract", String(repeating: "zz", count: 32)),   // not hex
             ("contract", "0x" + String(repeating: "ab", count: 31)), // 64 chars, only 31 bytes
+            ("contract", String(repeating: "+f", count: 32)),   // numeric pairs are not wire hex
+            ("contract", String(repeating: "-0", count: 32)),
             ("relay", "ftp://relay.test"),                      // wrong scheme
             ("relay", "not a url at all"),
             ("round", "not-a-uuid"),
