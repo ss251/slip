@@ -55,6 +55,15 @@ final class AppModel {
         crewName: PreviewContent.crew
     )
     private(set) var hasLocalSeal = false
+    /// Changes even when a replacement invite reuses its public UUID.
+    private(set) var localRoundRevision = UUID()
+
+    /// Public network identity captured for the imported round, independent of mutable defaults.
+    private struct JoinedNetwork: Equatable {
+        let relayURL: URL
+        let contractAddressHex: String
+    }
+    private var joinedNetwork: JoinedNetwork?
 
     func go(_ destination: SlipScreen) {
         history.append(screen)
@@ -84,6 +93,8 @@ final class AppModel {
             sealDeadline: sealDeadline
         )
         localRound = round
+        localRoundRevision = UUID()
+        joinedNetwork = nil
         sampleQuestion = question
         sideLabels = sides
         if let firstSide = sides.first {
@@ -118,21 +129,39 @@ final class AppModel {
         case joined
     }
 
-    /// Adopts a crew member's round instead of starting a new one. This is the whole
-    /// point of an invite: both phones must carry the *same* round id, or their seals
-    /// belong to two unrelated rounds and can never be opened together.
+    /// Imports public round metadata. An identical rejoin preserves its local seal;
+    /// changing any bound metadata or network identity replaces the local round.
+    /// `beforeReplacingRound` synchronously invalidates cached presentation and in-flight
+    /// work before a caller renders a replacement, including one reusing the same UUID.
     ///
     /// Network setup is adopted only when it is absent or already identical. An invite
     /// arrives from outside the app, so it must not be able to silently repoint a
     /// configured device at another relay or contract.
     @discardableResult
-    func join(invite: RoundInvite, defaults: UserDefaults = .standard) -> JoinOutcome {
-        // Re-tapping the link for the round we are already in must not disturb it. An
-        // invite lives in a group chat and gets tapped more than once; rebuilding the
-        // round here would reset its creation time and, worse, discard a seal already
-        // made in it.
+    func join(
+        invite: RoundInvite,
+        defaults: UserDefaults = .standard,
+        beforeReplacingRound: (UUID) -> Void = { _ in }
+    ) -> JoinOutcome {
+        let existing = NetworkSetup.load(defaults: defaults)
+        let incomingNetwork = JoinedNetwork(relayURL: invite.relayURL,
+                                            contractAddressHex: invite.contractAddressHex.lowercased())
+        let configuredNetwork = existing.map {
+            JoinedNetwork(relayURL: $0.relayURL, contractAddressHex: $0.contractAddressHex.lowercased())
+        }
+        // Both the round's original network and the current configuration must agree.
+        // A defaults edit must not relabel an old seal as a new contract's seal.
         let isRejoin = localRound.id == invite.roundID
+            && joinedNetwork == incomingNetwork
+            && configuredNetwork == incomingNetwork
+            && localRound.question == invite.question
+            && localRound.sides == invite.sides
+            && localRound.crewName == invite.crewName
+            && localRound.sealDeadline == invite.sealDeadline
         if !isRejoin {
+            beforeReplacingRound(localRound.id)
+            localRoundRevision = UUID()
+            joinedNetwork = incomingNetwork
             localRound = LocalRound(
                 id: invite.roundID,
                 question: invite.question,
@@ -148,7 +177,6 @@ final class AppModel {
         history.removeAll()
         screen = .seal
 
-        let existing = NetworkSetup.load(defaults: defaults)
         switch existing {
         case .none:
             NetworkSetup(relayURL: invite.relayURL,

@@ -116,7 +116,12 @@ extension SlipApp {
     @MainActor func accept(inviteURL url: URL) {
         do {
             let invite = try RoundInvite.decode(url: url)
-            switch model.join(invite: invite) {
+            let outcome = model.join(invite: invite, beforeReplacingRound: { oldRoundID in
+                flow.discard()
+                networkTracker.discard(roundID: oldRoundID)
+                if invite.roundID != oldRoundID { networkTracker.discard(roundID: invite.roundID) }
+            })
+            switch outcome {
             case .joined, .joinedAndAdoptedNetwork:
                 model.inform("Joined \(invite.crewName). Seal before the deadline.")
             case .joinedWithNetworkConflict:

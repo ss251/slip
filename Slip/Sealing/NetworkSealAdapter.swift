@@ -7,13 +7,31 @@ import Observation
 final class NetworkSealTracker {
     private(set) var receipts: [UUID: NetworkSealReceipt] = [:]
     private(set) var confirmations: [UUID: ConfirmationStatus] = [:]
+    private var recordingTokens: [UUID: UUID] = [:]
     let relayHost: String?
     /// `memberIdOf(secret)`: the public identity the steward enrols. Public by construction.
     var memberIDHex: String?
 
     init(relayHost: String? = nil) { self.relayHost = relayHost }
-    func record(_ receipt: NetworkSealReceipt, for roundID: UUID) { receipts[roundID] = receipt }
-    func record(_ status: ConfirmationStatus, for roundID: UUID) { confirmations[roundID] = status }
+    func recordingToken(for roundID: UUID) -> UUID {
+        if let token = recordingTokens[roundID] { return token }
+        let token = UUID()
+        recordingTokens[roundID] = token
+        return token
+    }
+    func discard(roundID: UUID) {
+        recordingTokens[roundID] = UUID()
+        receipts.removeValue(forKey: roundID)
+        confirmations.removeValue(forKey: roundID)
+    }
+    func record(_ receipt: NetworkSealReceipt, for roundID: UUID, token: UUID? = nil) {
+        guard !Task.isCancelled, token == nil || recordingTokens[roundID] == token else { return }
+        receipts[roundID] = receipt
+    }
+    func record(_ status: ConfirmationStatus, for roundID: UUID, token: UUID? = nil) {
+        guard !Task.isCancelled, token == nil || recordingTokens[roundID] == token else { return }
+        confirmations[roundID] = status
+    }
     func receipt(for roundID: UUID) -> NetworkSealReceipt? { receipts[roundID] }
 }
 
@@ -24,6 +42,8 @@ enum NetworkSealAdapter {
     static func operation(service: NetworkSealingService, tracker: NetworkSealTracker) -> SealFlowModel.SealOperation {
         { round, choice in
             guard let side = round.sideLabel(for: choice) else { throw AppSealError.invalidChoice }
+            let token = await tracker.recordingToken(for: round.id)
+            try Task.checkCancellation()
             let sealedAt = Date()
             let network: NetworkSealReceipt
             do { network = try await service.seal(choice: choice) } catch {
@@ -34,7 +54,8 @@ enum NetworkSealAdapter {
                 #endif
                 throw error
             }
-            await tracker.record(network, for: round.id)
+            try Task.checkCancellation()
+            await tracker.record(network, for: round.id, token: token)
             let receipt = LocalSealReceipt(
                 roundID: round.id,
                 questionCommitment: Data(),               // lives on chain; not derived client-side
@@ -48,7 +69,7 @@ enum NetworkSealAdapter {
                 roundID: round.id, question: round.question, sides: round.sides, crewName: round.crewName,
                 sealDeadline: round.sealDeadline, selectedSideIndex: choice == 1 ? 0 : 1, selectedSide: side, sealedAt: sealedAt)
             Task { [tracker] in
-                if let status = try? await service.confirmation(of: network) { await tracker.record(status, for: round.id) }
+                if let status = try? await service.confirmation(of: network) { await tracker.record(status, for: round.id, token: token) }
             }
             return LocalSealResult(receipt: receipt, privateDisplay: display)
         }

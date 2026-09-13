@@ -139,6 +139,28 @@ final class SealFlowModel {
         }
     }
 
+    /// A replacement invite can reuse a UUID. Drop all presentation for its previous
+    /// incarnation and invalidate completion tokens before showing the replacement.
+    func discard() {
+        if let activeRoundID { depart(roundID: activeRoundID) }
+        // A departed round's cached result may differ from AppModel's current UUID.
+        // Replacing the invite clears that cached presentation too.
+        operationToken = nil
+        roundToken = nil
+        sealTask?.cancel()
+        roundTask?.cancel()
+        sealTask = nil
+        roundTask = nil
+        activeRoundID = nil
+        isRoundBusy = false
+        result = nil
+        roundResult = nil
+        roundFailure = nil
+        failure = nil
+        stage = .choosing
+        feedbackRoundIDs.removeAll()
+    }
+
     func chooseAgain() {
         guard stage == .failed else { return }
         failure = nil

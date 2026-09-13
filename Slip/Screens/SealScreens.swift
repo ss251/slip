@@ -16,6 +16,8 @@ struct SealScreen: View {
     @State private var peekTask: Task<Void, Never>?
     @State private var accessibleHold: Task<Void, Never>?
     @State private var displayedRoundID: UUID?
+    @State private var heldRoundRevision: UUID?
+    @State private var heldChoice: String?
     private var proving: Bool { mode == .sealing || (flow.stage == .proving && flow.activeRoundID == model.localRound.id) }
     private var failed: Bool { mode == .proofFailed || (flow.stage == .failed && flow.activeRoundID == model.localRound.id) }
     private var already: Bool { mode == .alreadySealed || model.hasLocalSeal }
@@ -77,9 +79,9 @@ struct SealScreen: View {
         }
         .onChange(of: model.screen) { _, _ in cancelAccessibleHold(); concealPick() }
         .onChange(of: model.selectedSide) { _, _ in cancelAccessibleHold() }
-        .onChange(of: model.localRound.id) { oldID, newID in
-            flow.depart(roundID: oldID)
-            displayedRoundID = newID
+        .onChange(of: model.localRoundRevision) { _, _ in
+            if let displayedRoundID { flow.depart(roundID: displayedRoundID) }
+            displayedRoundID = model.localRound.id
             cancelAccessibleHold(); concealPick()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -183,10 +185,16 @@ struct SealScreen: View {
                         pressing: { pressing in
                             if pressing {
                                 cancelAccessibleHold()
+                                heldRoundRevision = model.localRoundRevision
+                                heldChoice = model.selectedSide
                                 hold.start(at: Date.timeIntervalSinceReferenceDate)
                             }
                             else { hold.cancel() }
-                        }, perform: { beginSeal() })
+                        }, perform: {
+                            guard heldRoundRevision == model.localRoundRevision,
+                                  heldChoice == model.selectedSide else { return }
+                            beginSeal()
+                        })
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel(holdAccessibility.label)
                     .accessibilityValue(holdAccessibility.value)
@@ -219,12 +227,14 @@ struct SealScreen: View {
     private func startAccessibleHold() {
         guard accessibleHold == nil, !already, !proving, !failed, scenePhase == .active else { return }
         let roundID = model.localRound.id
+        let revision = model.localRoundRevision
         let choice = model.selectedSide
         hold.start(at: Date.timeIntervalSinceReferenceDate)
         accessibleHold = Task {
             try? await Task.sleep(for: .seconds(SlipMotion.holdDuration))
             guard !Task.isCancelled else { return }
-            guard model.localRound.id == roundID, model.selectedSide == choice,
+            guard model.localRound.id == roundID, model.localRoundRevision == revision,
+                  model.selectedSide == choice,
                   scenePhase == .active, !already, !proving, !failed else {
                 cancelAccessibleHold()
                 return
@@ -235,6 +245,8 @@ struct SealScreen: View {
 
     private func cancelAccessibleHold() {
         accessibleHold?.cancel(); accessibleHold = nil
+        heldRoundRevision = nil
+        heldChoice = nil
         hold.cancel()
     }
 
@@ -374,7 +386,7 @@ struct TicketScreen: View {
         }.background(SlipColor.ticket.ignoresSafeArea()).preferredColorScheme(.dark)
             .onChange(of: scenePhase) { _, phase in if phase != .active { concealPick() } }
             .onChange(of: model.screen) { _, _ in concealPick() }
-            .onChange(of: model.localRound.id) { _, _ in concealPick() }
+            .onChange(of: model.localRoundRevision) { _, _ in concealPick() }
             .onDisappear { concealPick() }
             .task {
                 guard !model.isPreview, receipt != nil,

@@ -274,6 +274,14 @@ setup is also treated as absent. It does not establish network membership or ver
 round metadata, and configured conflicts still change local presentation. Those
 integration limitations must be resolved before claiming connected join support.
 
+Rejoin preservation compares the imported UUID, relay, contract, question, ordered sides,
+crew and deadline against the held round, plus the current network configuration.
+The original public network identity and a replacement revision stay in memory only.
+Replacing an invite clears cached private ticket presentation and public network receipts,
+cancels hold/peek state and invalidates late completion tokens, including when the UUID
+is reused. This does not authenticate the invite against chain state, revoke a transaction
+already submitted, or erase the local proving service’s private session cache.
+
 
 ### Experimental native seal relay (September 2026)
 
