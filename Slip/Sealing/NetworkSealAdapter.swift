@@ -20,7 +20,9 @@ final class NetworkSealTracker {
         return token
     }
     func discard(roundID: UUID) {
-        recordingTokens[roundID] = UUID()
+        // Absence rejects every old token; a later operation allocates a fresh one.
+        // Do not retain IDs from invites that never started a network operation.
+        recordingTokens.removeValue(forKey: roundID)
         receipts.removeValue(forKey: roundID)
         confirmations.removeValue(forKey: roundID)
     }
