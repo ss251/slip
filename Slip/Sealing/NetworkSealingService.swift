@@ -55,10 +55,12 @@ actor NetworkSealingService {
 
     func seal(choice: UInt8) async throws -> NetworkSealReceipt {
         guard choice == 0 || choice == 1 else { throw NetworkSealError.invalidChoice }
+        try Task.checkCancellation()
         guard !sealing else { throw NetworkSealError.sealInProgress }
         sealing = true; defer { sealing = false }
 
         let context = try await relay.context(for: contractAddressHex)
+        try Task.checkCancellation()
         // Reject before private execution. This also makes the later TTL addition safe.
         guard context.blockTime <= Self.maximumExactJavaScriptInteger - Self.ttlSeconds else {
             throw NetworkSealError.invalidBlockTime
@@ -82,6 +84,10 @@ actor NetworkSealingService {
             circuit: "sealPick", proofData: proofData, networkID: networkID,
             contractAddressHex: context.contractAddressHex, contractState: context.contractState,
             blockTime: context.blockTime, ttl: context.blockTime + Self.ttlSeconds)
+        // Native proving may finish after its presentation task was cancelled. Do not
+        // initiate a relay submission for that abandoned operation. This cannot recall
+        // a request that was already sent before cancellation.
+        try Task.checkCancellation()
         let receipt = try await relay.submit(provedTransaction: tx.data)
         return NetworkSealReceipt(commitment: commitment, txID: receipt.txID, submitPending: receipt.pending,
                                   executeDuration: executeDuration, assembleDuration: tx.duration,

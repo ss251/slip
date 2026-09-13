@@ -152,6 +152,48 @@ struct RelayBoundaryReviewTests {
         }
     }
 
+    actor GatedContextRelay: StewardRelay {
+        private var started = false
+        private var startWaiters: [CheckedContinuation<Void, Never>] = []
+        private var release: CheckedContinuation<Void, Never>?
+        private(set) var submissions = 0
+        func context(for contractAddressHex: String) async throws -> NetworkContext {
+            started = true
+            startWaiters.forEach { $0.resume() }
+            startWaiters.removeAll()
+            // Deliberately ignore cooperative cancellation like an already-started native call.
+            await withCheckedContinuation { release = $0 }
+            return NetworkContext(contractAddressHex: contractAddressHex,
+                                  contractState: Data(), blockTime: 1_788_000_600)
+        }
+        func waitUntilStarted() async {
+            guard !started else { return }
+            await withCheckedContinuation { startWaiters.append($0) }
+        }
+        func releaseContext() { release?.resume(); release = nil }
+        func submit(provedTransaction: Data) async throws -> SubmissionReceipt {
+            submissions += 1
+            return SubmissionReceipt(txID: "unexpected")
+        }
+        func confirm(commitmentHex: String) async throws -> ConfirmationStatus { .pending }
+    }
+
+    @Test("cancellation after context loading stops before private runtime execution")
+    func cancelledContextDoesNotStartProof() async {
+        let relay = GatedContextRelay()
+        let service = NetworkSealingService(relay: relay,
+            prover: Prover(artifacts: LocalSealingService.bundledArtifacts()),
+            contractAddressHex: String(repeating: "ab", count: 32),
+            deviceSecret: Data(repeating: 2, count: 32))
+        let pending = Task { try await service.seal(choice: 1) }
+        await relay.waitUntilStarted()
+        pending.cancel()
+        await relay.releaseContext()
+        // The deliberately invalid state must never reach ContractRuntime.
+        await #expect(throws: CancellationError.self) { _ = try await pending.value }
+        #expect(await relay.submissions == 0)
+    }
+
     actor InvalidTimeRelay: StewardRelay {
         let time: UInt64
         private(set) var submissions = 0
