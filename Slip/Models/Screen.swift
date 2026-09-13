@@ -104,8 +104,8 @@ final class AppModel {
         return round
     }
 
-    /// Accepts completion only for the current local identity, preventing a proof from
-    /// an abandoned round being relabelled as the newly edited slip.
+    /// Accepts completion only for the current UUID. Callers must also invalidate old
+    /// work when an invite replaces metadata while retaining that UUID.
     @discardableResult
     func markLocalSeal(roundID: UUID) -> Bool {
         guard localRound.id == roundID else { return false }
@@ -119,13 +119,14 @@ final class AppModel {
 
     /// What accepting an invite did, so the UI can be honest about it.
     enum JoinOutcome: Equatable {
-        /// Joined, and this device now points at the invite's relay and contract.
+        /// Imported metadata and saved the invite's relay/contract for a later launch.
+        /// This does not reconfigure the running sealing service.
         case joinedAndAdoptedNetwork
         /// Joined the round, but saved setup is incomplete or points to a *different*
         /// relay or contract, so its network setup was left alone. The running flow
         /// is not reconfigured by import; this does not establish connected readiness.
         case joinedWithNetworkConflict(configuredContractHex: String)
-        /// Joined; network setup already matched, or the app is running proof-only.
+        /// Imported metadata; saved network setup already matched.
         case joined
     }
 
