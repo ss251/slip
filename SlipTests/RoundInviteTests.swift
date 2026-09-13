@@ -156,4 +156,57 @@ struct RoundInviteTests {
         let object = try #require(parsed as? [String: Any])
         #expect(Set(object.keys) == ["v", "relay", "contract", "round", "question", "sides", "crew", "palette", "deadline"])
     }
+
+    @Test("relay credentials and query data cannot be serialized into a public invite")
+    func rejectsCredentialBearingRelays() throws {
+        let original = Self.invite()
+        let data = try #require(RoundInvite.base64URLDecode(original.encodedPayload()))
+        let base = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        for relay in ["https://user:password@relay.test", "https://relay.test?token=private",
+                      "https://relay.test#private"] {
+            let invite = RoundInvite(relayURL: try #require(URL(string: relay)),
+                contractAddressHex: original.contractAddressHex, roundID: original.roundID,
+                question: original.question, sides: original.sides, crewName: original.crewName,
+                paletteKey: original.paletteKey, sealDeadline: original.sealDeadline)
+            #expect(throws: RoundInvite.InviteError.malformed) { try invite.encodedPayload() }
+            var object = base
+            object["relay"] = relay
+            let payload = RoundInvite.base64URLEncode(try JSONSerialization.data(withJSONObject: object))
+            #expect(throws: RoundInvite.InviteError.malformed) {
+                try RoundInvite.decode(payload: payload, now: Self.now(before: original.sealDeadline))
+            }
+        }
+    }
+
+    @Test("oversized input and ambiguous link components are rejected")
+    func rejectsUnboundedAndDecoratedLinks() throws {
+        #expect(throws: RoundInvite.InviteError.malformed) {
+            try RoundInvite.decode(payload: String(repeating: "A", count: RoundInvite.maximumPayloadBytes + 1))
+        }
+        let invite = Self.invite()
+        let payload = try invite.encodedPayload()
+        for link in ["slip://user@join/", "slip://join:123/"] {
+            let url = try #require(URL(string: link + payload))
+            #expect(throws: RoundInvite.InviteError.malformed) {
+                try RoundInvite.decode(url: url, now: Self.now(before: invite.sealDeadline))
+            }
+        }
+        for suffix in ["?extra=value", "#extra", "/extra"] {
+            let url = try #require(URL(string: "slip://join/" + payload + suffix))
+            #expect(throws: RoundInvite.InviteError.malformed) {
+                try RoundInvite.decode(url: url, now: Self.now(before: invite.sealDeadline))
+            }
+        }
+    }
+
+    @Test("non-finite deadlines throw instead of trapping during encoding")
+    func rejectsNonFiniteDeadline() {
+        let original = Self.invite()
+        let invite = RoundInvite(relayURL: original.relayURL,
+            contractAddressHex: original.contractAddressHex, roundID: original.roundID,
+            question: original.question, sides: original.sides, crewName: original.crewName,
+            paletteKey: original.paletteKey, sealDeadline: Date(timeIntervalSince1970: .infinity))
+        #expect(throws: RoundInvite.InviteError.malformed) { try invite.encodedPayload() }
+    }
+
 }

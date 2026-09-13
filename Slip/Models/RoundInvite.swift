@@ -6,12 +6,12 @@ import MidnightKit
 /// Today each install derives its round locally, so two phones that "join the same slip"
 /// actually create two unrelated rounds. An invite carries the round's identity — where to
 /// submit, which contract, which round, and the human context needed to render it — so the
-/// joiner enrols into the creator's round instead of starting its own.
+/// joiner adopts local presentation metadata. It does not enrol a member on chain.
 ///
 /// **This payload is public.** It travels through whatever channel the crew already uses,
 /// so it carries no witness material: no choice, no salt, no device secret, and no relay
 /// credential. Only the commitment and the proof ever travel, and neither is in here.
-/// `RoundInviteTests.payloadCarriesNoPrivateMaterial` holds that line.
+/// Tests constrain the wire schema; callers must still supply only public text and URLs.
 struct RoundInvite: Equatable, Sendable {
     /// Where the joiner submits. The relay authorises use, not picks.
     let relayURL: URL
@@ -38,6 +38,13 @@ struct RoundInvite: Equatable, Sendable {
     static let version = 1
     static let scheme = "slip"
     static let joinHost = "join"
+    /// Bound untrusted input before base64 allocation and JSON decoding on the main actor.
+    static let maximumPayloadBytes = 16_384
+
+    private static func isPublicRelayURL(_ url: URL) -> Bool {
+        (url.scheme == "https" || url.scheme == "http") && url.host?.isEmpty == false
+            && url.user == nil && url.password == nil && url.query == nil && url.fragment == nil
+    }
 }
 
 // MARK: - Encoding
@@ -46,6 +53,9 @@ extension RoundInvite {
     /// A deterministic, URL-safe payload. Stable across runs and processes: the field order
     /// is sorted, the date is whole seconds, and nothing derives from a per-process seed.
     func encodedPayload() throws -> String {
+        guard Self.isPublicRelayURL(relayURL),
+              let deadline = Int(exactly: sealDeadline.timeIntervalSince1970.rounded())
+        else { throw InviteError.malformed }
         let wire = Wire(
             v: Self.version,
             relay: relayURL.absoluteString,
@@ -55,11 +65,13 @@ extension RoundInvite {
             sides: sides,
             crew: crewName,
             palette: paletteKey,
-            deadline: Int(sealDeadline.timeIntervalSince1970.rounded())
+            deadline: deadline
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        return Self.base64URLEncode(try encoder.encode(wire))
+        let payload = Self.base64URLEncode(try encoder.encode(wire))
+        guard payload.utf8.count <= Self.maximumPayloadBytes else { throw InviteError.malformed }
+        return payload
     }
 
     /// `slip://join/<payload>` — the link a member sends. A web fallback needs a real
@@ -80,13 +92,15 @@ extension RoundInvite {
     /// Rejects anything that is not a complete, current, still-open invite. `now` is
     /// injected so the expiry rule is testable without sleeping.
     static func decode(payload: String, now: Date = Date()) throws -> RoundInvite {
-        guard let data = base64URLDecode(payload) else { throw InviteError.malformed }
+        guard payload.utf8.count <= maximumPayloadBytes,
+              payload.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0)
+                  || (48...57).contains($0) || $0 == 45 || $0 == 95 }),
+              let data = base64URLDecode(payload) else { throw InviteError.malformed }
         let wire: Wire
         do { wire = try JSONDecoder().decode(Wire.self, from: data) } catch { throw InviteError.malformed }
 
         guard wire.v == version else { throw InviteError.unsupportedVersion(wire.v) }
-        guard let relay = URL(string: wire.relay), relay.scheme == "https" || relay.scheme == "http",
-              relay.host?.isEmpty == false else { throw InviteError.malformed }
+        guard let relay = URL(string: wire.relay), isPublicRelayURL(relay) else { throw InviteError.malformed }
         let contract = wire.contract.lowercased()
         guard contract.count == 64, Data(hex: contract) != nil else { throw InviteError.malformed }
         guard let round = UUID(uuidString: wire.round) else { throw InviteError.malformed }
@@ -103,10 +117,11 @@ extension RoundInvite {
                            paletteKey: wire.palette, sealDeadline: deadline)
     }
 
-    /// Accepts the `slip://join/<payload>` form as well as a bare payload, because people
-    /// paste both.
+    /// Accepts only `slip://join/<payload>`; bare payloads use the separate overload.
     static func decode(url: URL, now: Date = Date()) throws -> RoundInvite {
-        guard url.scheme == scheme, url.host == joinHost else { throw InviteError.malformed }
+        guard url.scheme == scheme, url.host == joinHost,
+              url.user == nil, url.password == nil, url.port == nil,
+              url.query == nil, url.fragment == nil else { throw InviteError.malformed }
         let payload = url.path.hasPrefix("/") ? String(url.path.dropFirst()) : url.path
         return try decode(payload: payload, now: now)
     }

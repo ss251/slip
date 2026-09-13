@@ -137,4 +137,21 @@ struct RoundJoinTests {
         #expect(model.localRound.id == invite.roundID)
         #expect(model.screen == .seal)
     }
+
+    @MainActor
+    @Test("a relay-only conflict across repeated joins preserves all saved network fields")
+    func repeatedRelayOnlyConflictPreservesSetup() {
+        let invite = RoundInviteTests.invite()
+        let defaults = Self.defaults()
+        let configured = NetworkSetup(relayURL: URL(string: "https://own-relay.test")!,
+            contractAddressHex: invite.contractAddressHex, relayToken: "existing-token")
+        configured.save(defaults: defaults)
+        let model = AppModel()
+        for _ in 0..<2 {
+            #expect(model.join(invite: invite, defaults: defaults)
+                == .joinedWithNetworkConflict(configuredContractHex: configured.contractAddressHex))
+            #expect(NetworkSetup.load(defaults: defaults) == configured)
+        }
+    }
+
 }
