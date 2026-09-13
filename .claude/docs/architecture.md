@@ -156,22 +156,12 @@ only evidence was that the kickoff scopes the buildathon to `undeployed` — but
 not support it", and we should have weighted the compatibility matrix more heavily
 than the absence of a hard blocker.
 
-## Stakes and offramping
+## Stakes are future scope
 
-**Stakes are a contract-minted token with no offramp, by design.** Not a
-limitation we are working around — the exit does not exist: the Cardano bridge is
-**one-way at mainnet launch** (*"there will not be, by mainnet launch, a
-protocol-level bridging mechanism... from Midnight to Cardano"*), and DUST can
-never be a stake (non-transferable, decays, *"cannot store value"* — deliberately,
-for regulatory reasons). So value landing on Midnight has no sanctioned route out
-regardless of what we build.
-
-Every cryptographic property, the escrow, the sealed pot and the claim flow work
-identically with a valueless token; what changes is that nothing converts to
-money, which keeps Slip a game rather than a licensed betting operator. Real
-money is a post-mainnet, licensed-entity conversation — pooled wagering with
-payout is gambling plus money transmission in most jurisdictions, and App Store
-real-money gaming requires per-territory licensed entities.
+Wave 1 is unitless: points and social outcomes only. The current contract has no
+stake token, escrow, pooled pot or payout-claim flow. Shielded-token stakes are an
+exploration for Wave 2 in `roadmap.md`, not an implemented mechanic. Read that
+roadmap before adding any value transfer.
 
 ## Round lifecycle — four phases
 

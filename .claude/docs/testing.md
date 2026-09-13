@@ -9,7 +9,7 @@ Evidence over assertion. Every feature lands with its tests; every summary quote
    - adversarial: double-seal (nullifier), reveal-before-deadline, reveal that doesn't match its seal, non-member seal, non-steward settle;
    - **privacy probes:** assert the raw choice/salt never appears in public state or emitted data for every hidden case;
    - property-style checks where cheap (score conservation across a round).
-2. **MidnightKit** — Rust unit tests for FFI surface; Swift round-trip test (commit → proof → local verify); a *bench test* asserting proving-time and peak-RSS budgets per circuit (fails on regression, numbers in `midnightkit.md`).
+2. **MidnightKit** — Swift round-trip tests (commit → proof → local verify) and native lifecycle tests. Current suites record timings and check valid durations; they do not enforce per-circuit upper latency or peak-RSS budgets. Those performance gates are planned. Measurements in `midnightkit.md` are observations, not an automated regression gate; the Rust prover source is external, so this tree does not establish Rust unit-test coverage.
 3. **App (SwiftUI)** — unit tests for round state machine; snapshot tests for every screen in light theme + Dynamic Type XL.
    - iOS 26 gotcha: snapshots must render via `drawHierarchyInKeyWindow`, and snapshot suites are `@Suite(.serialized)` — parallel window access flakes.
    - Unreachable states get `#if DEBUG` launch arguments so tests/screenshots can force them.
