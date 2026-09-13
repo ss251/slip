@@ -59,6 +59,60 @@ struct RelayBoundaryReviewTests {
         }
     }
 
+    final class BoundedResponseStub: URLProtocol, @unchecked Sendable {
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override func startLoading() {
+            let url = request.url!
+            let submit = request.httpMethod == "POST"
+            #expect(request.timeoutInterval == (submit ? 120 : 30))
+            let scenario = url.host!
+            var headers = ["Content-Type": "application/json"]
+            if scenario == "oversized-header.test" {
+                headers["Content-Length"] = "16777217" // above both endpoint ceilings
+            }
+            let response = HTTPURLResponse(url: url, statusCode: 200,
+                                           httpVersion: "HTTP/1.1", headerFields: headers)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            let json = submit ? #"{"txId":"synthetic"}"# : #"{"status":"confirmed"}"#
+            var data = Data(json.utf8)
+            let count = scenario == "oversized-stream.test" ? 65_537 : 65_536
+            data.append(Data(repeating: 32, count: count - data.count))
+            // No declared length in the streaming cases: enforcement must count bytes.
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        override func stopLoading() {}
+    }
+
+    @Test("relay bodies are bounded with and without a declared length",
+          arguments: ["oversized-header.test", "oversized-stream.test", "at-limit.test"])
+    func boundsResponseBodies(_ host: String) async throws {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [BoundedResponseStub.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel() }
+        let relay = HTTPStewardRelay(baseURL: URL(string: "https://\(host)")!, session: session)
+        if host == "at-limit.test" {
+            #expect(try await relay.confirm(commitmentHex: String(repeating: "ab", count: 32)) == .confirmed)
+            let receipt = try await relay.submit(provedTransaction: Data([1]))
+            #expect(receipt.txID == "synthetic")
+            #expect(!receipt.pending)
+        } else {
+            await #expect(throws: RelayError.malformedResponse("responseSize")) {
+                _ = try await relay.confirm(commitmentHex: String(repeating: "ab", count: 32))
+            }
+            await #expect(throws: RelayError.malformedResponse("responseSize")) {
+                _ = try await relay.submit(provedTransaction: Data([1]))
+            }
+            if host == "oversized-header.test" {
+                await #expect(throws: RelayError.malformedResponse("responseSize")) {
+                    _ = try await relay.context(for: String(repeating: "ab", count: 32))
+                }
+            }
+        }
+    }
+
     actor InvalidTimeRelay: StewardRelay {
         let time: UInt64
         private(set) var submissions = 0

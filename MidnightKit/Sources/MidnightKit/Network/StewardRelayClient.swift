@@ -54,6 +54,10 @@ public struct HTTPStewardRelay: StewardRelay {
     private let session: URLSession
     /// Bearer token the relay requires; sent on every request, never logged.
     private let authToken: String?
+    // Public context includes hex-encoded contract state; receipts/status are tiny JSON.
+    // Transport ceilings, not promises about the maximum supported on-chain crew size.
+    private static let maximumContextBytes = 16 * 1_024 * 1_024
+    private static let maximumReceiptBytes = 64 * 1_024
     public init(baseURL: URL, authToken: String? = nil, session: URLSession = .shared) { self.baseURL = baseURL; self.authToken = authToken; self.session = session }
 
     private func authorize(_ request: inout URLRequest) {
@@ -69,7 +73,7 @@ public struct HTTPStewardRelay: StewardRelay {
     /// witness in reach. It must be 64 lowercase hex characters, and it must be the contract
     /// we asked about: a relay may not silently redirect a seal at a different contract.
     public func context(for contractAddressHex: String) async throws -> NetworkContext {
-        let dto: ContextDTO = try await get("context/\(contractAddressHex)")
+        let dto: ContextDTO = try await get("context/\(contractAddressHex)", maximumBytes: Self.maximumContextBytes)
         // ASCII explicitly: `Character.isHexDigit` also accepts full-width forms, which are
         // not what we mean by hex and not what the JavaScript literal should ever receive.
         let address = dto.address.lowercased()
@@ -90,31 +94,53 @@ public struct HTTPStewardRelay: StewardRelay {
         // node acceptance; give that room so a slow-but-successful submit is not cut off.
         request.timeoutInterval = 120
         authorize(&request)
-        let data: Data, response: URLResponse
+        let data: Data
         do {
-            (data, response) = try await session.data(for: request)
+            data = try await boundedData(for: request, maximumBytes: Self.maximumReceiptBytes)
         } catch let error as URLError where error.code == .timedOut {
             // The transaction may already be on-chain; report pending and let the caller
             // resolve it through `confirm(commitmentHex:)` rather than showing a failure.
             return SubmissionReceipt(txID: "", pending: true)
         }
-        try Self.check(response)
         return try JSONDecoder().decode(SubmissionReceipt.self, from: data)
     }
 
     public func confirm(commitmentHex: String) async throws -> ConfirmationStatus {
-        let dto: ConfirmDTO = try await get("confirm/\(commitmentHex)")
+        let dto: ConfirmDTO = try await get("confirm/\(commitmentHex)", maximumBytes: Self.maximumReceiptBytes)
         return dto.status
     }
 
-    private func get<T: Decodable>(_ path: String) async throws -> T {
+    private func get<T: Decodable>(_ path: String, maximumBytes: Int) async throws -> T {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         // Context/confirmation reads should not inherit an injected session's timeout.
         request.timeoutInterval = 30
         authorize(&request)
-        let (data, response) = try await session.data(for: request)
-        try Self.check(response)
+        let data = try await boundedData(for: request, maximumBytes: maximumBytes)
         return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Check headers before reading and count actual bytes even without a trustworthy
+    /// Content-Length. Cancelling on every exit also stops an oversized stream early.
+    private func boundedData(for request: URLRequest, maximumBytes: Int) async throws -> Data {
+        let (bytes, response) = try await session.bytes(for: request)
+        defer { bytes.task.cancel() }
+        try Self.check(response)
+        guard response.expectedContentLength <= Int64(maximumBytes) else {
+            throw RelayError.malformedResponse("responseSize")
+        }
+        return try await withTaskCancellationHandler {
+            var data = Data()
+            for try await byte in bytes {
+                try Task.checkCancellation()
+                guard data.count < maximumBytes else {
+                    throw RelayError.malformedResponse("responseSize")
+                }
+                data.append(byte)
+            }
+            return data
+        } onCancel: {
+            bytes.task.cancel()
+        }
     }
 
     private static func check(_ response: URLResponse) throws {
