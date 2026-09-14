@@ -4,9 +4,9 @@ Slip is pre-alpha. This policy covers the current development branch; any suppor
 
 ## Report a vulnerability privately
 
-Private reporting contact: `<OWNER_SECURITY_EMAIL>`.
+Private reporting contact: sailesh.e123@gmail.com.
 
-**Owner action before publication:** replace this placeholder with a monitored security-reporting address. Do not publish a real vulnerability in a public issue while the private reporting contact is being configured.
+Do not publish a real vulnerability in a public issue. Report it privately to the address above first.
 
 Include the affected commit or release, platform and toolchain versions, expected and observed behavior, a minimal reproduction using synthetic data, and the impact you believe is possible. Redact credentials, personal identifiers, private picks, salts, device secrets and private proving transcripts. Do not send a live user's witness to demonstrate a leak. If sensitive material is essential to understanding the report, first arrange a private handling method with the owner.
 
