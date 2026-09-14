@@ -1,0 +1,147 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Slip — Midnight Buildathon Wave 1</title>
+<style>
+  @page { size: 297mm 167mm; margin: 0; }
+  :root{
+    --ink:#14110f; --muted:#6b635d; --faint:#9a918a;
+    --bg:#faf8f6; --card:#ffffff; --rule:#e6e0da;
+    --seal:#c1392a; --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);color:var(--ink);background:var(--bg);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .s{width:297mm;height:167mm;padding:20mm 22mm;page-break-after:always;position:relative;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
+  .s:last-child{page-break-after:auto}
+  .dark{background:#14110f;color:#f5f1ee}
+  .dark .muted,.dark .faint{color:#9a918a}
+  .num{position:absolute;right:22mm;bottom:12mm;font:500 9pt var(--mono);color:var(--faint);letter-spacing:.06em}
+  .kicker{font:600 9.5pt var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--seal);margin-bottom:7mm}
+  h1{font-size:40pt;line-height:1.04;letter-spacing:-.022em;font-weight:680;max-width:20ch}
+  h2{font-size:27pt;line-height:1.12;letter-spacing:-.018em;font-weight:660;max-width:24ch}
+  .lede{font-size:14.5pt;line-height:1.5;color:var(--muted);max-width:56ch;margin-top:7mm}
+  .dark .lede{color:#b7ada6}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  .grow{flex:1}
+  .row{display:flex;gap:6mm;margin-top:9mm}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:4mm;padding:7mm 7mm 8mm;flex:1}
+  .dark .card{background:#1d1917;border-color:#2e2825}
+  .dark .card p{color:#b7ada6}
+  .dark .unit{color:#9a918a}
+  .card h3{font-size:12pt;font-weight:640;letter-spacing:-.01em;margin-bottom:3mm}
+  .card p{font-size:10.5pt;line-height:1.5;color:var(--muted)}
+  .big{font:680 30pt/1 var(--sans);letter-spacing:-.02em}
+  .unit{font:500 10pt var(--mono);color:var(--faint);margin-top:2.5mm;letter-spacing:.02em}
+  table{width:100%;border-collapse:collapse;margin-top:8mm;font-size:11pt}
+  th{text-align:left;font-weight:600;font-size:9pt;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding-bottom:3mm;border-bottom:1px solid var(--rule)}
+  td{padding:4.2mm 0;border-bottom:1px solid var(--rule);font-variant-numeric:tabular-nums}
+  td.m{font-family:var(--mono);font-size:10.5pt;color:var(--muted)}
+  td.r{text-align:right;font-family:var(--mono);font-size:10.5pt}
+  .dark th,.dark td{border-color:#2e2825}
+  ul{margin-top:7mm;list-style:none}
+  li{font-size:12.5pt;line-height:1.6;color:var(--muted);padding-left:7mm;position:relative;margin-bottom:3.5mm;max-width:62ch}
+  li::before{content:"";position:absolute;left:0;top:2.6mm;width:2.2mm;height:2.2mm;border-radius:50%;background:var(--seal)}
+  li b{color:var(--ink);font-weight:620}
+  .dark li b{color:#f5f1ee}
+  .seal{width:15mm;height:15mm;border-radius:50%;background:var(--seal);position:relative;margin-bottom:9mm}
+  .seal::after{content:"";position:absolute;inset:3.4mm;border-radius:50%;border:1.1mm solid rgba(255,255,255,.34)}
+  .foot{font-size:10pt;color:var(--faint);border-top:1px solid var(--rule);padding-top:5mm;margin-top:auto}
+  .dark .foot{border-color:#2e2825}
+  .tag{display:inline-block;font:600 9pt var(--mono);color:var(--seal);border:1px solid var(--seal);border-radius:999px;padding:1.6mm 4mm;margin-right:2.5mm}
+</style></head><body>
+
+<section class="s">
+  <div class="seal"></div>
+  <h1>Sealed group predictions, proved on your phone.</h1>
+  <p class="lede">Slip is an iOS app for calling things with friends. You commit to a pick, it stays hidden, and later you prove your opening matches the seal you made — without anyone having to take your word for it.</p>
+  <div class="foot">Midnight Buildathon · Wave 1 · github.com/ss251/slip</div>
+  <div class="num">01</div>
+</section>
+
+<section class="s dark">
+  <div class="kicker">The problem</div>
+  <h2>Every pick’em app promises nobody peeked.</h2>
+  <p class="lede">The promise rests on a server you cannot inspect, run by people you do not know. When the group chat argues about who actually called it, the evidence is a screenshot and a claim.</p>
+  <p class="lede">A prediction is only interesting if it was <i>fixed</i> before the outcome. That is a cryptographic property, and today it is enforced by trust.</p>
+  <div class="num">02</div>
+</section>
+
+<section class="s">
+  <div class="kicker">The loop</div>
+  <h2>Commit. Seal. Open. Prove.</h2>
+  <div class="row">
+    <div class="card"><h3>Pick</h3><p>Choose a side. Your choice and a random salt stay on the phone as witness data.</p></div>
+    <div class="card"><h3>Seal</h3><p>Hold to seal. The phone generates a zero-knowledge proof and publishes only a commitment.</p></div>
+    <div class="card"><h3>Open</h3><p>At the deadline the pick opens and is checked against its commitment by the circuit.</p></div>
+    <div class="card"><h3>Call</h3><p>The outcome is settled separately. Opening establishes what was sealed, not what happened.</p></div>
+  </div>
+  <p class="lede">A reveal that does not match its commitment is rejected by the contract, not smoothed over by the client.</p>
+  <div class="num">03</div>
+</section>
+
+<section class="s">
+  <div class="kicker">What makes it different</div>
+  <h2>The proof is generated on the phone. There is no proof server.</h2>
+  <p class="lede">MidnightKit is our Swift package wrapping <span style="font-family:var(--mono);font-size:11pt">midnight-zk</span> and <span style="font-family:var(--mono);font-size:11pt">midnight-ledger</span> as a Rust static library for <span style="font-family:var(--mono);font-size:11pt">aarch64-apple-ios</span>, running the Compact runtime under JavaScriptCore.</p>
+  <ul>
+    <li>Removing the proof server is not an optimisation. <b>A proof server is exactly the party that would otherwise have to be trusted.</b></li>
+    <li>The witness — <span style="font-family:var(--mono)">{choice, salt}</span> — is never logged, never persisted unencrypted, never transmitted. <b>Only the commitment and the proof travel.</b></li>
+    <li>One Compact contract, six circuits: <span style="font-family:var(--mono);font-size:10.5pt">enrollMember · createSlip · sealPick · reveal · settle · dispute</span></li>
+  </ul>
+  <div class="num">04</div>
+</section>
+
+<section class="s">
+  <div class="kicker">Evidence</div>
+  <h2>Five circuits, proved on the device, in one run.</h2>
+  <table>
+    <tr><th>Circuit</th><th style="text-align:right">Prepare</th><th style="text-align:right">Key load</th><th style="text-align:right">Proof</th><th style="text-align:right">Size</th></tr>
+    <tr><td>Add the local player</td><td class="r">39.0 ms</td><td class="r">15.0 ms</td><td class="r">520 ms</td><td class="r">4,480 B</td></tr>
+    <tr><td>Create the round</td><td class="r">22.0 ms</td><td class="r">14.0 ms</td><td class="r">504 ms</td><td class="r">4,480 B</td></tr>
+    <tr><td>Seal the pick</td><td class="r">23.5 ms</td><td class="r">26.0 ms</td><td class="r">969 ms</td><td class="r">4,480 B</td></tr>
+    <tr><td>Open the pick</td><td class="r">35.9 ms</td><td class="r">30.0 ms</td><td class="r">950 ms</td><td class="r">4,480 B</td></tr>
+    <tr><td>Call the outcome</td><td class="r">34.8 ms</td><td class="r">15.0 ms</td><td class="r">644 ms</td><td class="r">4,480 B</td></tr>
+  </table>
+  <p class="lede" style="margin-top:7mm">The app shows these itself, under the line “Measured locally. These proofs have not been submitted to a network.”</p>
+  <div class="num">05</div>
+</section>
+
+<section class="s dark">
+  <div class="kicker">Quality</div>
+  <h2>Verified, not asserted.</h2>
+  <div class="row">
+    <div class="card"><div class="big">140</div><div class="unit">tests · 22 suites</div><p style="margin-top:5mm">Including 120 reference renders and a privacy test asserting the shared invite payload carries no witness material.</p></div>
+    <div class="card"><div class="big">5,238 B</div><div class="unit">proved tx · 1,256 ms</div><p style="margin-top:5mm">Phone → relay → local devnet, reaching <span style="font-family:var(--mono);font-size:9.5pt">SucceedEntirely</span> at block 3672 with the indexed commitment matching exactly.</p></div>
+    <div class="card"><div class="big">0.31.1</div><div class="unit">compiler · ledger 8</div><p style="margin-top:5mm">Pinned to the stack Midnight’s networks actually run. A freshness gate fails the build on drift.</p></div>
+  </div>
+  <div class="num">06</div>
+</section>
+
+<section class="s">
+  <div class="kicker">Limits, stated plainly</div>
+  <h2>What this does not claim.</h2>
+  <ul>
+    <li><b>Connected crews are not shipped.</b> <span style="font-family:var(--mono);font-size:10.5pt">enrollMember</span> is gated by <span style="font-family:var(--mono);font-size:10.5pt">assertSteward()</span>, so joining is not self-service. Tapping an invite imports public round metadata; it does not establish on-chain membership. The app says so on screen.</li>
+    <li><b>The deployment is a local devnet</b>, not a public testnet.</li>
+    <li><b>The proof establishes that an opening matches its seal.</b> It does not establish that nobody saw an unlocked phone.</li>
+  </ul>
+  <p class="lede">These are in the README in the same words. A privacy product that overstates itself has already failed at the thing it sells.</p>
+  <div class="num">07</div>
+</section>
+
+<section class="s">
+  <div class="kicker">Next</div>
+  <h2>Wave 2</h2>
+  <ul>
+    <li><b>Steward-side enrolment through the relay</b>, so a crew can be assembled before a round opens — the honest version of “joining”.</li>
+    <li><b>Public testnet deployment</b>, moving off the local devnet.</li>
+    <li><b>TestFlight</b>, putting the app in real testers’ hands.</li>
+    <li><b>The two-device round</b>: two phones, one round, both seal, both open, standings agree.</li>
+  </ul>
+  <div class="foot">
+    <span class="tag">Apache-2.0</span><span class="tag">midnightntwrk</span><span class="tag">compact</span>
+    <div style="margin-top:5mm">github.com/ss251/slip</div>
+  </div>
+  <div class="num">08</div>
+</section>
+
+</body></html>
