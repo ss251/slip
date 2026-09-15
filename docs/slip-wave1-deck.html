@@ -69,7 +69,7 @@
   <h2>Commit. Seal. Open. Prove.</h2>
   <div class="row">
     <div class="card"><h3>Pick</h3><p>Choose a side. The choice is witness data; its salt is derived in-circuit from the device secret, never supplied by the host.</p></div>
-    <div class="card"><h3>Seal</h3><p>Hold to seal. The phone generates a zero-knowledge proof and publishes only a commitment.</p></div>
+    <div class="card"><h3>Seal</h3><p>Hold to seal. The phone generates the zero-knowledge proof itself. In this Wave 1 build nothing is submitted — proof and commitment stay on the device.</p></div>
     <div class="card"><h3>Open</h3><p>At the deadline the pick opens and is checked against its commitment by the circuit.</p></div>
     <div class="card"><h3>Call</h3><p>The outcome is settled separately. Opening establishes what was sealed, not what happened.</p></div>
   </div>
@@ -92,6 +92,7 @@
 <section class="s">
   <div class="kicker">Evidence</div>
   <h2>Five circuits, proved on the device, in one run.</h2>
+  <p class="lede" style="margin-top:4mm;font-size:12pt">iPhone 17 Pro simulator, from the run recorded in the demo video. The README's physical-device and older-runtime tables report their own separate numbers.</p>
   <table>
     <tr><th>Circuit</th><th style="text-align:right">Prepare</th><th style="text-align:right">Key load</th><th style="text-align:right">Proof</th><th style="text-align:right">Size</th></tr>
     <tr><td>Add the local player</td><td class="r">39.0 ms</td><td class="r">15.0 ms</td><td class="r">520 ms</td><td class="r">4,480 B</td></tr>

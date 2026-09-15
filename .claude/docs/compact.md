@@ -22,14 +22,14 @@ export circuit sealPick(...): [] {
 }
 ```
 
-- `export ledger` = public state; `export circuit` = externally callable; plain circuits are internal.
+- All ledger state is on-chain and public whether or not it is exported; `export` on a ledger field only generates the JS/TS binding so a host can read it back by name. `export circuit` = externally callable; plain circuits are internal.
 - The compiler emits TypeScript types + zkir + proving keys per circuit; keep generated artifacts in `build/` (tracked or LFS'd — decide at first compile).
 - Toolchain via the `compact` CLI (`compact update` to switch versions). Pin the exact compile command in AGENTS.md once verified.
 
 ## Patterns Slip depends on
 
 - **Commit–reveal:** commitment = hash/commit over `{choice, salt}` (stdlib provides persistent/transient commit + hash primitives — check current names in the stdlib reference before use). Reveal circuit re-derives and asserts equality. The RPS example in the official samples is the canonical tiny version of this pattern.
-- **Nullifiers:** one seal per member per round — derive a nullifier from member secret + round id; assert unseen, then disclose it.
+- **One seal per member per round:** a `seals: Map` keyed on the public member id, reset each round via `seals.resetToDefault()` and guarded by `assert(!seals.member(publicMemberId))`. This is a reset-per-round guard, not a Zswap-style nullifier.
 - **Deadline discipline:** seal circuits assert before-deadline; reveal circuits assert after. Time source = ledger/block context, not device clock.
 - **Membership (optional v1.5):** Merkle root of crew in ledger; membership witness proves inclusion without listing members.
 
@@ -37,7 +37,7 @@ export circuit sealPick(...): [] {
 
 - Every witness-derived value that reaches ledger state **must** pass `disclose()` — the compiler enforces awareness; our repo adds a comment per disclose (see `.claude/rules/privacy.md`).
 - No floats; integer types are sized (`Uint<n>`) — size them to the domain, they cost circuit rows.
-- Circuit size ⇒ k ⇒ params size and proving time. Slip targets the k≈10 class; if a change balloons constraints, stop and re-budget (`midnightkit.md`).
+- Circuit size ⇒ k ⇒ params size and proving time. Slip's circuits measure k13-k14 (`sealPick` is k=14); if a change balloons constraints, stop and re-budget (`midnightkit.md`).
 - Keep circuits few: every exported circuit is another proving key users may need.
 
 ## Version discipline (enforced, not remembered)

@@ -54,7 +54,7 @@ Canonical shapes (compile syntax confirmed against official Midnight CI and the 
 ## Hard constraints — do not design around these, design *with* them
 
 - **Single contract.** Cross-contract calls exist in Compact 0.33.0+ but not on any network we can reach, and not in our compiler (0.31.1). Midnight DevRel, 2026-08-31: "0.34.0 is not currently supported by our networks... we are steadily working towards making contract to contract calls available to everyone." We use none of it, and a cross-contract-reachable circuit cannot call witnesses anyway — ours must.
-- **The witness never leaves the device.** A pick is `{choice, salt}` witness data. It must never be logged, sent, persisted unencrypted, or included in analytics (there are none). Only the zero-knowledge proof and the commitment travel. This is the product; treat any violation as a release blocker.
+- **The witness never leaves the device.** A pick is a `{choice}` witness; its salt is derived in-circuit from the device secret (`pickSaltOf`), deliberately not supplied by the host. It must never be logged, sent, persisted unencrypted, or included in analytics (there are none). What travels is the zero-knowledge proof, the commitment, and the member's identity hash that `sealPick` discloses into the `seals` map (already public from enrolment) — never the pick. This is the product; treat any violation as a release blocker.
 - **Wave 1 is unitless.** No tokens, no stakes, no monetary value — points and banter only. Do not add value transfer without reading `.claude/docs/roadmap.md`.
 - **Reveals must verify.** A reveal that doesn't match its commitment is rejected by the contract, not smoothed over by the client.
 

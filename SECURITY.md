@@ -14,7 +14,7 @@ The owner will review the report privately, agree on any additional evidence nee
 
 ## The privacy invariant
 
-**The witness `{choice, salt}` never leaves the device.** During sealing, only the commitment and the zero-knowledge proof may travel for the private pick. Never export witness data or private runtime/proving transcripts as logs, analytics, crash payloads, screenshots, launch arguments, clipboard content or network requests. Do not persist private pick material unencrypted.
+**The witness `{choice, salt}` never leaves the device.** During sealing the pick itself never travels. What becomes public is the commitment, the zero-knowledge proof, and the member's identity hash — `sealPick` discloses it into the `seals` map, and enrolment made it public already. Never export witness data or private runtime/proving transcripts as logs, analytics, crash payloads, screenshots, launch arguments, clipboard content or network requests. Do not persist private pick material unencrypted.
 
 Opening is an intentional disclosure: after the opening is verified against its original commitment, the choice may become public. That does not make the salt or device secret public. Public round metadata and verified openings must remain distinct from private witness material in both implementation and documentation.
 
