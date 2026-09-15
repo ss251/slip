@@ -10,7 +10,7 @@ Built on [Midnight](https://docs.midnight.network) (a privacy blockchain whose C
 
 - **iOS app** — Swift 6 / SwiftUI, iOS 17+ baseline with iOS 26 features (Liquid Glass chrome) where available.
 - **MidnightKit** — Swift package wrapping Rust (`midnight-zk`, `midnight-ledger`) as a static library for `aarch64-apple-ios(-sim)`; runs the Compact JS runtime under JavaScriptCore (verified 2026-09-04 — see `.claude/docs/midnightkit.md`). Proofs are generated on the phone; no proof server.
-- **Contract** — one Compact smart contract (`contracts/slip.compact`): commit–reveal with per-round nullifiers. A compiling contract is the heartbeat of this repo; never merge with a broken compile.
+- **Contract** — one Compact smart contract (`contracts/slip.compact`): commit–reveal, with the round and the member id bound into every commitment so a seal cannot be replayed into another round or by another member. A compiling contract is the heartbeat of this repo; never merge with a broken compile.
 - **Local network** — Midnight `undeployed` mode for all development: node `ws://localhost:9944`, indexer `http://localhost:8088/api/v4/graphql`, proof server `http://localhost:6300` (used by tooling only — the app itself never calls one).
 
 ## Repository layout

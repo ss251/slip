@@ -68,7 +68,7 @@
   <div class="kicker">The loop</div>
   <h2>Commit. Seal. Open. Prove.</h2>
   <div class="row">
-    <div class="card"><h3>Pick</h3><p>Choose a side. Your choice and a random salt stay on the phone as witness data.</p></div>
+    <div class="card"><h3>Pick</h3><p>Choose a side. The choice is witness data; its salt is derived in-circuit from the device secret, never supplied by the host.</p></div>
     <div class="card"><h3>Seal</h3><p>Hold to seal. The phone generates a zero-knowledge proof and publishes only a commitment.</p></div>
     <div class="card"><h3>Open</h3><p>At the deadline the pick opens and is checked against its commitment by the circuit.</p></div>
     <div class="card"><h3>Call</h3><p>The outcome is settled separately. Opening establishes what was sealed, not what happened.</p></div>
@@ -79,7 +79,7 @@
 
 <section class="s">
   <div class="kicker">What makes it different</div>
-  <h2>The proof is generated on the phone. There is no proof server.</h2>
+  <h2>The seal proof is generated on the phone, by the phone.</h2>
   <p class="lede">MidnightKit is our Swift package wrapping <span style="font-family:var(--mono);font-size:11pt">midnight-zk</span> and <span style="font-family:var(--mono);font-size:11pt">midnight-ledger</span> as a Rust static library for <span style="font-family:var(--mono);font-size:11pt">aarch64-apple-ios</span>, running the Compact runtime under JavaScriptCore.</p>
   <ul>
     <li>Removing the proof server is not an optimisation. <b>A proof server is exactly the party that would otherwise have to be trusted.</b></li>
@@ -109,7 +109,7 @@
   <h2>Verified, not asserted.</h2>
   <div class="row">
     <div class="card"><div class="big">140</div><div class="unit">tests · 22 suites</div><p style="margin-top:5mm">Including 120 reference renders and a privacy test asserting the shared invite payload carries no witness material.</p></div>
-    <div class="card"><div class="big">5,238 B</div><div class="unit">proved tx · 1,256 ms</div><p style="margin-top:5mm">Phone → relay → local devnet, reaching <span style="font-family:var(--mono);font-size:9.5pt">SucceedEntirely</span> at block 3672 with the indexed commitment matching exactly.</p></div>
+    <div class="card"><div class="big">5,238 B</div><div class="unit">proved tx · 1,256 ms</div><p style="margin-top:5mm">Native prover → authenticated relay → local devnet, reaching <span style="font-family:var(--mono);font-size:9.5pt">SucceedEntirely</span> with the indexed commitment matching exactly. Host-produced; not physical-iPhone provenance.</p></div>
     <div class="card"><div class="big">0.31.1</div><div class="unit">compiler · ledger 8</div><p style="margin-top:5mm">Pinned to the stack Midnight’s networks actually run. A freshness gate fails the build on drift.</p></div>
   </div>
   <div class="num">06</div>
