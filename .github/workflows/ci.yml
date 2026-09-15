@@ -2,7 +2,7 @@
 # - official midnightntwrk repos: setup-compact-action (SHA-pinned below exactly as
 #   midnightntwrk/midnight-verifiable-credentials pins it), COMPACT_COMPILER_VERSION env,
 #   and `compact compile --version` as the toolchain sanity check.
-# - the vendored midnight-compact skill (reference/testing.md §13): compile + simulator
+# - the vendored MIDSKILLS testing skill (.agents/skills/testing/SKILL.md): compile + simulator
 #   tests on every commit; local-network tests only on main; privacy/invariant tests in
 #   the per-commit lane.
 name: ci
@@ -46,7 +46,7 @@ jobs:
         run: sh scripts/freshness-gate.sh
       - name: Compile contract
         if: steps.has.outputs.contract == 'true'
-        run: compact compile contracts/slip.compact build/slip
+        run: compact compile contracts/slip.compact contracts/build
       - name: Simulator tests (incl. privacy-leak + invariant probes)
         if: steps.has.outputs.contract == 'true'
         working-directory: contracts
@@ -115,7 +115,7 @@ jobs:
           xcodegen generate
           xcodebuild -scheme Slip -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" test
 
-  # per skill §13: local-network e2e runs on main only, not every PR
+  # local-network e2e runs on main only, not every PR
   network-e2e:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -136,7 +136,7 @@ jobs:
             curl -sf -o /dev/null http://localhost:9944/health && break; sleep 5
           done
           docker compose -f infra/devnet-compose.yml -p slip-devnet ps
-      - name: Use Node 22 (midnight-js v5 requires >= 22.12)
+      - name: Use Node 22 (midnight-js 4.1.1 needs Node 22.x or higher)
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -145,7 +145,7 @@ jobs:
         run: |
           if ! grep -q '"test:network"' package.json; then echo "no network tests yet — skipping"; exit 0; fi
           # test:network builds with ZK keys, links the build into e2e/, installs that
-          # workspace (midnight-js v5 beta, kept separate from the simulator's pins),
+          # workspace (midnight-js 4.1.1, kept separate from the simulator's pins),
           # then deploys and calls.
           npm install && npm run test:network
       - name: Devnet logs on failure

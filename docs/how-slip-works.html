@@ -5064,7 +5064,7 @@
         <path data-edge-from="create_slip" data-edge-to="pick_side" data-edge-key="1" data-composition-points="136,367;170,367" d="M 136 367 L 170 367" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="pick_side" data-edge-to="witness_local" data-edge-key="2" data-composition-points="213,393;213,491;136,491" d="M 213 393 L 213 491 L 136 491" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="pick_side" data-edge-to="prove_local" data-edge-key="3" data-composition-points="227,393;227,491;236,491" d="M 227 393 L 227 491 L 236 491" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="prove_local" data-edge-to="commit_chain" data-edge-label="proof only" data-edge-key="4" data-composition-points="300,525;300,538;300,538;300,589" d="M 300 525 L 300 538 L 300 538 L 300 589" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="prove_local" data-edge-to="commit_chain" data-edge-label="proof + commitment" data-edge-key="4" data-composition-points="300,525;300,538;300,538;300,589" d="M 300 525 L 300 538 L 300 538 L 300 589" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="crew_joins" data-edge-to="roster_live" data-edge-label="each seals" data-edge-key="5" data-composition-points="220,145;220,177;430,177;430,145" d="M 220 145 L 220 177 L 430 177 L 430 145" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="roster_live" data-edge-to="nudge_unsealed" data-edge-key="6" data-composition-points="430,145;430,243;452,243" d="M 430 145 L 430 243 L 452 243" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="commit_chain" data-edge-to="deadline_lock" data-edge-label="all sealed" data-edge-key="7" data-composition-points="300,641;300,673;500,673;500,641" d="M 300 641 L 300 673 L 500 673 L 500 641" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
@@ -5112,8 +5112,8 @@
           <text data-detail="context" x="220" y="379" class="t-muted" font-size="8" text-anchor="middle">hidden from all</text>
         </g>
 
-        <g id="node-witness_local" data-node-id="witness_local" data-node-label="Witness" tabindex="0" role="button" aria-label="Focus Witness, choice + salt, MidnightKit · on-device prover › Create + join" aria-pressed="false" data-node-kind="security" data-node-sublabel="choice + salt" data-node-tag="never uploads" data-node-context="MidnightKit · on-device prover › Create + join">
-          <title>Witness · choice + salt · MidnightKit · on-device prover › Create + join · never uploads</title>
+        <g id="node-witness_local" data-node-id="witness_local" data-node-label="Witness" tabindex="0" role="button" aria-label="Focus Witness, choice with salt derived in-circuit, MidnightKit · on-device prover › Create + join" aria-pressed="false" data-node-kind="security" data-node-sublabel="choice + salt" data-node-tag="never uploads" data-node-context="MidnightKit · on-device prover › Create + join">
+          <title>Witness · choice (salt derived in-circuit) · MidnightKit · on-device prover › Create + join · never uploads</title>
           <rect x="40" y="457" width="96" height="68" rx="6" class="c-mask"/>
           <rect x="40" y="457" width="96" height="68" rx="6" class="c-security" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(46 463) scale(0.6875)">
@@ -5121,7 +5121,7 @@
             <path d="m5.8 8 1.5 1.5 3-3"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="88" y="478" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Witness</text>
-          <text data-detail="context" x="88" y="495" class="t-muted" font-size="8" text-anchor="middle">choice + salt</text>
+          <text data-detail="context" x="88" y="495" class="t-muted" font-size="8" text-anchor="middle">choice · salt derived</text>
         <text data-detail="fine" x="88" y="513" class="t-security" font-size="7" text-anchor="middle">never uploads</text>
         </g>
 
@@ -5222,9 +5222,9 @@
 
 
 
-        <g data-detail="context" data-edge-from="prove_local" data-edge-to="commit_chain" data-edge-label="proof only" data-edge-key="4">
+        <g data-detail="context" data-edge-from="prove_local" data-edge-to="commit_chain" data-edge-label="proof + commitment" data-edge-key="4">
           <rect x="271" y="529" width="58" height="14" rx="3" class="c-mask"/>
-          <text x="300" y="539" class="t-backend" font-size="8" text-anchor="middle">proof only</text>
+          <text x="300" y="539" class="t-backend" font-size="8" text-anchor="middle">proof + commitment</text>
         </g>
         <g data-detail="context" data-edge-from="crew_joins" data-edge-to="roster_live" data-edge-label="each seals" data-edge-key="5">
           <rect x="296" y="157" width="58" height="14" rx="3" class="c-mask"/>
@@ -5457,7 +5457,7 @@
           <h3>The private opening stays local</h3>
         </div>
         <ul>
-          <li>&bull; The witness (choice + salt) lives only on the iPhone</li>
+          <li>&bull; The pick stays on the iPhone: <code>choice</code> is the witness, and its salt is derived in-circuit from the device secret rather than supplied by the host</li>
           <li>&bull; MidnightKit proves it locally — no proof server ever sees a side</li>
           <li>&bull; On reveal, the choice is deliberately public; the secret and derived salt stay local</li>
         </ul>
