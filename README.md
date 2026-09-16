@@ -79,6 +79,27 @@ Authenticated host relay demo (2026-09-05): a fresh local contract was deployed 
 
 Both tables are single-run observations (host CPU, then the phone), not latency promises or a performance budget. Preparation includes runtime initialization and replay of accepted steps; key/prove durations come from `Proof`. Reproduce the public-only `LOCAL_ROUND_PROOF` measurements with `LocalRoundServiceTests`. Local execution/proving does **not** establish network acceptance. Source decisions and version caveats: [Phase 4 sources](docs/phase4-sources.md).
 
+## For judges: architecture and Midnight integration in ten minutes
+
+**One contract, two ledgers.** [`contracts/slip.compact`](contracts/slip.compact) declares the public ledger state — round `status`, `questionCommit`, the four deadlines, `roundId`, the `crew` set, `seals: Map<memberId, commitment>`, `reveals`, the two tallies, `outcome`, `disputedBy` — and exactly two witnesses that make up the private state: `localSecretKey()` and `localPick()`. The pick's salt is not a witness; `pickSaltOf` derives it in-circuit from the device secret, so the host can never supply a weak one. Six circuits: `enrollMember`, `createSlip`, `sealPick`, `reveal`, `settle`, `dispute`. Every `disclose()` carries a comment saying what becomes public and why; the commitment itself is never disclosed, it becomes public by being written into `seals`.
+
+**Proving happens on the phone.** MidnightKit links `midnight-zk` and `midnight-ledger` as a Rust static library for `aarch64-apple-ios` and runs the compiler's JavaScript output under JavaScriptCore. There is no proof server in the sealing path; the [architecture note](.claude/docs/architecture.md#system-shape) explains why that matters on mobile specifically and where the trust boundary sits. The [disclosure ledger](.claude/docs/architecture.md#disclosure-ledger) lists every data flow that leaves the device.
+
+**Evaluate it.**
+
+```sh
+# 1. The technical gate: the contract compiles (compiler 0.31.1, language 0.23.0)
+compact compile contracts/slip.compact contracts/build
+
+# 2. Contract simulator tests, including the privacy-leak probe
+(cd contracts && npm test)
+
+# 3. The app and MidnightKit suites (real proofs for every circuit)
+xcodebuild -scheme Slip -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -jobs 4 -parallel-testing-enabled NO test
+```
+
+CI runs the same three gates plus the design gate on every push; the run for the submitted commit is linked from the AKINDO entry. The [demo runbook](docs/demo.md) reproduces the video's local round tap by tap, and [`docs/phase7-sources.md`](docs/phase7-sources.md) is the dated evidence matrix for the relay and devnet claims. What is built and what is planned is stated plainly on the [How Slip works page](docs/how-slip-works.html).
+
 ## Build and test
 
 Swift 6/SwiftUI, a **17.0 deployment minimum with simulator validation on iOS 17.5**, and Liquid Glass where available. **The Debug suite passed on iOS 27.0, 18.6 and 17.5.** Canonical pixel references belong to iOS 27.0.0: 97 tests passed with all 120 comparisons. iOS 18.6 and 17.5 each passed 96 tests with one explicit comparison skip naming the reference and running runtimes, and zero failures.
