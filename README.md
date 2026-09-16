@@ -162,6 +162,18 @@ See [CHANGELOG.md](CHANGELOG.md) for the dated Wave 1 capability history and its
 
 Start with [CONTRIBUTING.md](CONTRIBUTING.md) for development and verification requirements, and [SECURITY.md](SECURITY.md) for the privacy invariant and private vulnerability reporting. [AGENTS.md](AGENTS.md) maps the repository and its deeper references. Midnight-specific work requires kapa, Midnight Expert and MIDSKILLS, plus compiler/test verification. Commits must include their source and gate evidence. Private owner handoffs are intentionally not published.
 
+## Built with, credited
+
+Slip is built on [Midnight](https://midnight.network). The pieces of the ecosystem it stands on, and their licenses, are listed in [NOTICE](NOTICE):
+
+- **midnight-zk** and **midnight-ledger** (Apache-2.0) — the proving system and ledger 8 crates, linked into MidnightKit as a Rust static library for iOS.
+- **Compact** compiler 0.31.1, `compact-runtime` 0.16.0 and **midnight-js** 4.1.1 (Apache-2.0) — the contract toolchain and the simulator and e2e dependencies.
+- **Kuira SDK** by Kuira Labs (Apache-2.0) — the extracted Compact runtime bundle that MidnightKit runs under JavaScriptCore, with four local patches marked in the file.
+- **midnight-node**, **indexer-standalone** and **proof-server** images — the local `undeployed` network used for development and the relay evidence; the app itself never calls a proof server.
+- **Midnight Expert** plugins and the **kapa** documentation MCP (MIT), and **MIDSKILLS** by Kali-Decoder (MIT, vendored in `.agents/skills`) — used to write and verify Compact against the real compiler.
+
+Built for the AKINDO Midnight Buildathon, Wave 1.
+
 ## License
 
 Apache-2.0
