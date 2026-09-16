@@ -81,7 +81,7 @@ affected snapshots and their matching v6 boards.
 
 **[v5 (Paper)](../../docs/design/v5/) is superseded and kept for diffing.** The owner
 will refresh the Paper file later; it does not govern the current app reference.
-The interactive flow explainer is [docs/how-slip-works.html](../../docs/how-slip-works.html).
+The public explainer page is [docs/how-slip-works.html](../../docs/how-slip-works.html): static HTML in these tokens, built from the v6 boards.
 
 `docs/design/*.png` (v4, eight boards) is **superseded** — kept only for diffing.
 Do not build against it.
