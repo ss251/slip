@@ -4,7 +4,7 @@ Sealed group predictions with friends. The current app proves a single-player lo
 
 Built on [Midnight](https://docs.midnight.network) (a privacy blockchain whose Compact language compiles to zero-knowledge circuits) with **on-device proof generation** via MidnightKit, our Swift/Rust proving layer.
 
-**Status:** pre-alpha, private repository being prepared for public release (Wave 1 milestone: 2026-09-16). Publication remains owner-controlled; this file is the map.
+**Status:** pre-alpha, public repository as of 2026-09-16 (Wave 1 milestone); this file is the map.
 
 ## Tech stack
 
