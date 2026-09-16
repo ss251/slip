@@ -164,7 +164,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md) for development and verification r
 
 ## Built with, credited
 
-Slip is built on [Midnight](https://midnight.network). The pieces of the ecosystem it stands on, and their licenses, are listed in [NOTICE](NOTICE):
+This project is built on the Midnight Network. The pieces of the ecosystem it stands on, and their licenses, are listed in [NOTICE](NOTICE):
 
 - **midnight-zk** and **midnight-ledger** (Apache-2.0) — the proving system and ledger 8 crates, linked into MidnightKit as a Rust static library for iOS.
 - **Compact** compiler 0.31.1, `compact-runtime` 0.16.0 and **midnight-js** 4.1.1 (Apache-2.0) — the contract toolchain and the simulator and e2e dependencies.
@@ -172,7 +172,7 @@ Slip is built on [Midnight](https://midnight.network). The pieces of the ecosyst
 - **midnight-node**, **indexer-standalone** and **proof-server** images — the local `undeployed` network used for development and the relay evidence; the app itself never calls a proof server.
 - **Midnight Expert** plugins and the **kapa** documentation MCP (MIT), and **MIDSKILLS** by Kali-Decoder (MIT, vendored in `.agents/skills`) — used to write and verify Compact against the real compiler.
 
-Built for the AKINDO Midnight Buildathon, Wave 1.
+Built for the AKINDO Midnight Buildathon, Wave 1. The submitted state is tagged [`wave1-submission`](https://github.com/ss251/slip/releases/tag/wave1-submission); Wave 2 deltas are measured from it.
 
 ## License
 
